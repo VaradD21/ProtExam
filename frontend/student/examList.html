@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProExam - Select Exam</title>
+  <link rel="stylesheet" href="css/exam-list-styles.css">
+</head>
+<body>
+  <div class="exam-list-container">
+    <header class="header">
+      <div class="header-content">
+        <h1>ProExam</h1>
+        <p class="subtitle">Online Examination System</p>
+      </div>
+      <button class="btn-logout" id="logoutBtn">Logout</button>
+    </header>
+
+    <main class="main-content">
+      <section class="exams-section">
+        <h2>Available Exams</h2>
+        <div id="examsList" class="exams-grid"></div>
+      </section>
+
+      <section class="sessions-section" style="display: none;">
+        <h2>Completed Exams</h2>
+        <div id="sessionsList" class="sessions-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="js/examList.js"></script>
+</body>
+</html>

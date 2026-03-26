@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProExam - Organizer Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="organizer-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <h1>ProExam</h1>
+        <p class="role">Organizer</p>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-view="dashboard">
+          📊 Dashboard
+        </button>
+        <button class="nav-btn" data-view="exams">
+          📝 Exams
+        </button>
+        <button class="nav-btn" data-view="monitoring">
+          👁️ Monitoring
+        </button>
+        <button class="nav-btn" data-view="results">
+          📈 Results
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">O</div>
+          <div class="user-details">
+            <p id="userName">Organizer</p>
+            <p class="user-email">organizer@exam.com</p>
+          </div>
+        </div>
+        <button class="btn-logout" id="logoutBtn">Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Dashboard View -->
+      <section id="dashboardView" class="view active">
+        <h2>Dashboard</h2>
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📝</div>
+            <div class="stat-content">
+              <p class="stat-label">Total Exams</p>
+              <p class="stat-value" id="totalExams">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+              <p class="stat-label">Active Sessions</p>
+              <p class="stat-value" id="activeSessions">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-content">
+              <p class="stat-label">Violations Detected</p>
+              <p class="stat-value" id="totalViolations">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">✓</div>
+            <div class="stat-content">
+              <p class="stat-label">Completed Exams</p>
+              <p class="stat-value" id="completedExams">0</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="recent-activity">
+          <h3>Recent Exams</h3>
+          <div id="recentExamsList" class="exams-list"></div>
+        </div>
+      </section>
+
+      <!-- Exams Management View -->
+      <section id="examsView" class="view">
+        <div class="view-header">
+          <h2>Manage Exams</h2>
+          <button class="btn-primary" id="createExamBtn">+ Create New Exam</button>
+        </div>
+
+        <div id="examsList" class="exams-table"></div>
+      </section>
+
+      <!-- Monitoring View -->
+      <section id="monitoringView" class="view">
+        <h2>Live Monitoring</h2>
+        
+        <div class="monitoring-controls">
+          <select id="examSelectMonitoring" class="exam-select">
+            <option value="">Select Exam to Monitor</option>
+          </select>
+        </div>
+
+        <div id="studentMonitoringList" class="students-monitoring"></div>
+      </section>
+
+      <!-- Results View -->
+      <section id="resultsView" class="view">
+        <h2>Exam Results</h2>
+
+        <div class="results-controls">
+          <select id="examSelectResults" class="exam-select">
+            <option value="">Select Exam to View Results</option>
+          </select>
+        </div>
+
+        <div id="resultsList" class="results-table"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Create/Edit Exam Modal -->
+  <div id="examModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Create New Exam</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+
+      <form id="examForm">
+        <div class="form-group">
+          <label for="examTitle">Exam Title *</label>
+          <input type="text" id="examTitle" required>
+        </div>
+
+        <div class="form-group">
+          <label for="examDescription">Description</label>
+          <textarea id="examDescription" rows="3"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="examDuration">Duration (minutes) *</label>
+            <input type="number" id="examDuration" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label for="examTotalMarks">Total Marks *</label>
+            <input type="number" id="examTotalMarks" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label for="examPassingMarks">Passing Marks *</label>
+            <input type="number" id="examPassingMarks" min="0" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="examInstructions">Instructions</label>
+          <textarea id="examInstructions" rows="4" placeholder="Special instructions for students..."></textarea>
+        </div>
+
+        <div class="button-group">
+          <button type="button" class="btn-cancel">Cancel</button>
+          <button type="submit" class="btn-primary">Save Exam</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Question Management Modal -->
+  <div id="questionModal" class="modal" style="display: none;">
+    <div class="modal-content question-modal">
+      <div class="modal-header">
+        <h3>Question Bank</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+
+      <div class="question-management">
+        <button class="btn-primary" id="addQuestionBtn">+ Add Question</button>
+
+        <div id="questionsList" class="questions-list"></div>
+      </div>
+
+      <div id="questionForm" class="question-form" style="display: none;">
+        <h4>Add Question</h4>
+
+        <div class="form-group">
+          <label for="questionType">Question Type *</label>
+          <select id="questionType" required>
+            <option value="mcq">Multiple Choice</option>
+            <option value="descriptive">Descriptive</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="questionContent">Question Text *</label>
+          <textarea id="questionContent" rows="4" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="questionMarks">Marks *</label>
+          <input type="number" id="questionMarks" min="1" required>
+        </div>
+
+        <div id="mcqContainer" style="display: none;">
+          <h5>Multiple Choice Options</h5>
+          <div id="optionsList"></div>
+          <button type="button" id="addOptionBtn" class="btn-secondary">+ Add Option</button>
+        </div>
+
+        <div class="button-group">
+          <button type="button" id="cancelQuestionBtn" class="btn-cancel">Cancel</button>
+          <button type="button" id="saveQuestionBtn" class="btn-primary">Save Question</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student Details Modal -->
+  <div id="studentDetailsModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Student Details & Violations</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+
+      <div class="student-details">
+        <h4 id="studentName">Student Name</h4>
+        <div id="studentViolations" class="violations-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

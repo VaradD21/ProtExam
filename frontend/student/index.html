@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProExam - Student Exam Interface</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="exam-container" id="examContainer">
+    <!-- Header -->
+    <header class="exam-header">
+      <div class="header-left">
+        <h2 id="examTitle">Exam Title</h2>
+        <div class="exam-info">
+          <span id="currentQuestion">Question: 1</span>
+          <span id="totalQuestions">of 0</span>
+        </div>
+      </div>
+      <div class="header-middle">
+        <div class="timer" id="timer">00:00:00</div>
+        <div class="timer-status" id="timerStatus"></div>
+      </div>
+      <div class="header-right">
+        <button class="btn-logout" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+
+    <div class="proctoring-header" id="proctoringHeader">
+      <div class="camera-box">
+        <video id="cameraFeed" autoplay muted playsinline></video>
+        <p class="camera-label">Live Camera (proctoring will send snapshots automatically)</p>
+      </div>
+      <div class="camera-status" id="cameraStatus">Camera: initializing...</div>
+    </div>
+
+    <!-- Violation Warning -->
+    <div id="violationWarning" class="violation-warning" style="display: none;">
+      <span id="violationText"></span>
+      <button class="btn-close-warning" id="closeWarningBtn">✕</button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="exam-content">
+      <!-- Question Navigation -->
+      <aside class="question-panel">
+        <div class="panel-header">
+          <h3>Questions</h3>
+          <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="answered">Answered</button>
+            <button class="filter-btn" data-filter="unanswered">Unanswered</button>
+          </div>
+        </div>
+        <div class="questions-list" id="questionsList"></div>
+      </aside>
+
+      <!-- Question Display -->
+      <main class="question-area">
+        <div class="question-content">
+          <h3 id="questionNumber">Question 1</h3>
+          <div class="question-text" id="questionText">Loading question...</div>
+
+          <!-- MCQ Options -->
+          <div id="mcqOptions" class="mcq-options" style="display: none;"></div>
+
+          <!-- Descriptive Answer -->
+          <div id="descriptiveAnswer" class="descriptive-answer" style="display: none;">
+            <textarea id="answerTextarea" placeholder="Type your answer here..." rows="8"></textarea>
+          </div>
+
+          <!-- Question Navigation Buttons -->
+          <div class="navigation-buttons">
+            <button class="btn-nav" id="prevBtn">← Previous</button>
+            <button class="btn-submit-q" id="submitQBtn">Save & Next</button>
+          </div>
+        </div>
+
+        <!-- Submit Exam Button -->
+        <div class="submit-exam-section">
+          <button class="btn-submit-exam" id="submitExamBtn">Submit Exam</button>
+          <p class="warning-text">Submitting the exam will end your session</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- Suspicious Activity Indicator -->
+    <div class="activity-indicator">
+      <div class="violation-count">
+        <span>⚠️ Violations:</span>
+        <span id="violationCount">0</span>
+      </div>
+      <div class="status-indicator">
+        <span>Status:</span>
+        <span id="statusIndicator" class="status-safe">Active</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-cheating detection script -->
+  <script src="../js/config.js"></script>
+  <script src="js/antiCheating.js"></script>
+  <script src="js/examInterface.js"></script>
+</body>
+</html>

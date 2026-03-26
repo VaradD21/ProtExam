@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProExam - Exam Results</title>
+  <link rel="stylesheet" href="css/results-styles.css">
+</head>
+<body>
+  <div class="results-container">
+    <header class="header">
+      <h1>ProExam Results</h1>
+      <button class="btn-home" id="homeBtn">← Back to Exams</button>
+    </header>
+
+    <main class="main-content">
+      <section class="results-section">
+        <div class="results-header">
+          <h2 id="examTitle">Exam Title</h2>
+          <div class="results-summary">
+            <div class="summary-item">
+              <span class="label">Your Score</span>
+              <span class="value" id="totalScore">0</span>
+              <span class="max">/ <span id="maxMarks">100</span></span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Percentage</span>
+              <span class="value" id="percentage">0%</span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Status</span>
+              <span class="value" id="passStatus">Loading...</span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Violations</span>
+              <span class="value" id="violationCount">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-details">
+          <h3>Question-wise Analysis</h3>
+          <div id="questionResults" class="questions-results"></div>
+        </div>
+
+        <div class="activity-log">
+          <h3>Activity Log</h3>
+          <div id="activityList" class="activity-list"></div>
+        </div>
+
+        <div class="violations-log">
+          <h3>Violations Detected</h3>
+          <div id="violationsList" class="violations-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="js/results.js"></script>
+</body>
+</html>
