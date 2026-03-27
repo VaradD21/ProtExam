@@ -13,29 +13,60 @@ class ExamInterface {
     this.timeRemaining = 0;
     this.timerInterval = null;
     this.isSubmitted = false;
+    this.errorCount = 0;
+    this.maxErrors = 3;
 
     window.examInterface = this; // Make globally accessible
+
+    // Error boundary
+    window.addEventListener('error', (event) => {
+      this.handleGlobalError(event.error, 'Global error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      this.handleGlobalError(event.reason, 'Unhandled promise rejection');
+    });
+
     this.init();
   }
 
-  async init() {
-    if (!checkAuth()) return;
+  handleGlobalError(error, context) {
+    console.error(`[${context}]`, error);
+    this.errorCount++;
 
-    const user = getUser();
-    console.log('Current user:', user);
-
-    // Get exam ID from URL or query params
-    const urlParams = new URLSearchParams(window.location.search);
-    const examId = urlParams.get('examId');
-
-    if (!examId) {
-      this.showError('No exam selected. Redirecting to exam list...');
-      setTimeout(() => window.location.href = '/student/', 2000);
+    if (this.errorCount >= this.maxErrors) {
+      this.showError('Multiple errors detected. Please refresh the page.');
       return;
     }
 
-    this.showLoading('Loading exam...');
+    // Show user-friendly error message
+    this.showToast(`An error occurred: ${error.message || 'Unknown error'}`, 'error');
+  }
+
+  async init() {
     try {
+      if (!checkAuth()) return;
+
+      const user = getUser();
+      if (user.role !== 'student') {
+        alert('Access denied. Only students can access this page.');
+        clearAuth();
+        window.location.href = '/login.html';
+        return;
+      }
+      console.log('Current user:', user);
+
+      // Get exam ID from URL or query params
+      const urlParams = new URLSearchParams(window.location.search);
+      const examId = urlParams.get('examId');
+
+      if (!examId) {
+        this.showError('No exam selected. Redirecting to exam list...');
+        setTimeout(() => window.location.href = '/student/', 2000);
+        return;
+      }
+
+      this.showLoading('Loading exam...');
       await this.loadExam(examId);
       await this.startExamSession();
       await this.requestFullscreen();
@@ -72,6 +103,14 @@ class ExamInterface {
   }
 
   async startExamSession() {
+    // Show confirmation dialog
+    const confirmed = await this.showExamConfirmation();
+    if (!confirmed) {
+      // Redirect back to exam list
+      window.location.href = '/student/examList.html';
+      return;
+    }
+
     try {
       const response = await apiCall('/submissions/session/start', 'POST', {
         examId: this.exam.id
@@ -88,11 +127,62 @@ class ExamInterface {
         };
       });
 
+      // Request full screen mode
+      await this.requestFullscreen();
+
       console.log('Exam session started:', this.sessionId);
     } catch (err) {
       console.error('Failed to start exam session:', err);
       throw new Error('Unable to start exam session. Please try refreshing the page.');
     }
+  }
+
+  async showExamConfirmation() {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content confirmation-modal">
+          <div class="modal-header">
+            <h3>Start Exam</h3>
+          </div>
+          <div class="modal-body">
+            <div class="exam-summary">
+              <h4>${this.exam.title}</h4>
+              <p><strong>Duration:</strong> ${this.exam.duration_minutes} minutes</p>
+              <p><strong>Total Questions:</strong> ${this.exam.total_questions}</p>
+              <p><strong>Passing Score:</strong> ${this.exam.passing_score}%</p>
+              ${this.exam.instructions ? `<p><strong>Instructions:</strong> ${this.exam.instructions}</p>` : ''}
+            </div>
+            <div class="warning-message">
+              <p><strong>Important:</strong></p>
+              <ul>
+                <li>The exam will run in full screen mode</li>
+                <li>Exiting full screen may result in automatic submission</li>
+                <li>Ensure you have a stable internet connection</li>
+                <li>Do not refresh or close the browser window</li>
+              </ul>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-cancel" id="cancelBtn">Cancel</button>
+            <button class="btn-primary" id="startBtn">Start Exam</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        modal.remove();
+        resolve(false);
+      });
+
+      document.getElementById('startBtn').addEventListener('click', () => {
+        modal.remove();
+        resolve(true);
+      });
+    });
   }
 
   async requestFullscreen() {
@@ -114,15 +204,28 @@ class ExamInterface {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        }, 
+        audio: false 
+      });
       cameraFeed.srcObject = stream;
       cameraStatus.textContent = 'Camera: active';
 
-      this.cameraInterval = setInterval(() => this.captureCameraSnapshot(), 15001); // every 15 seconds
+      // Enhanced camera monitoring
+      this.cameraInterval = setInterval(() => this.captureCameraSnapshot(), 15000); // every 15 seconds
+      this.faceDetectionInterval = setInterval(() => this.detectFacePresence(), 5000); // every 5 seconds
       this.cameraStream = stream;
+
+      // Add camera controls
+      this.addCameraControls();
     } catch (err) {
       console.error('Failed to access camera:', err);
       cameraStatus.textContent = 'Camera: permission denied';
+      this.logViolation('camera_denied', { error: err.message }, 'high');
     }
   }
 
@@ -131,12 +234,116 @@ class ExamInterface {
       clearInterval(this.cameraInterval);
       this.cameraInterval = null;
     }
+    if (this.faceDetectionInterval) {
+      clearInterval(this.faceDetectionInterval);
+      this.faceDetectionInterval = null;
+    }
     if (this.cameraStream) {
       this.cameraStream.getTracks().forEach(track => track.stop());
       this.cameraStream = null;
     }
     const cameraStatus = document.getElementById('cameraStatus');
     if (cameraStatus) cameraStatus.textContent = 'Camera: stopped';
+  }
+
+  addCameraControls() {
+    const cameraContainer = document.querySelector('.camera-box');
+    if (!cameraContainer) return;
+
+    const controls = document.createElement('div');
+    controls.className = 'camera-controls';
+    controls.innerHTML = `
+      <button id="toggleCamera" class="camera-btn" title="Toggle Camera">📷</button>
+      <button id="testCamera" class="camera-btn" title="Test Camera">🔍</button>
+    `;
+    cameraContainer.appendChild(controls);
+
+    // Toggle camera visibility
+    document.getElementById('toggleCamera').addEventListener('click', () => {
+      const video = document.getElementById('cameraFeed');
+      video.style.display = video.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Test camera snapshot
+    document.getElementById('testCamera').addEventListener('click', () => {
+      this.captureCameraSnapshot();
+      this.showSuccess('Camera test snapshot taken');
+    });
+  }
+
+  async detectFacePresence() {
+    try {
+      const video = document.getElementById('cameraFeed');
+      if (!video || !video.srcObject) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Simple face detection using brightness analysis
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // Calculate average brightness
+      let totalBrightness = 0;
+      let pixelCount = 0;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const brightness = (r + g + b) / 3;
+        totalBrightness += brightness;
+        pixelCount++;
+      }
+      
+      const avgBrightness = totalBrightness / pixelCount;
+      
+      // Check for face-like patterns (basic heuristic)
+      const centerX = Math.floor(canvas.width / 2);
+      const centerY = Math.floor(canvas.height / 2);
+      const sampleSize = 50;
+      
+      let faceDetected = false;
+      const centerBrightness = this.getAverageBrightness(ctx, centerX - sampleSize, centerY - sampleSize, sampleSize * 2, sampleSize * 2);
+      
+      // If center is significantly brighter than edges, might indicate face
+      if (centerBrightness > avgBrightness * 1.2) {
+        faceDetected = true;
+      }
+
+      // Log face detection status
+      if (!faceDetected && this.lastFaceDetected !== false) {
+        this.logViolation('face_not_detected', { 
+          avgBrightness: Math.round(avgBrightness),
+          centerBrightness: Math.round(centerBrightness)
+        }, 'medium');
+        this.showWarning('Face not clearly detected in camera feed');
+      }
+      
+      this.lastFaceDetected = faceDetected;
+      
+    } catch (err) {
+      console.error('Face detection error:', err);
+    }
+  }
+
+  getAverageBrightness(ctx, x, y, width, height) {
+    try {
+      const imageData = ctx.getImageData(x, y, width, height);
+      const data = imageData.data;
+      let total = 0;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        total += (data[i] + data[i + 1] + data[i + 2]) / 3;
+      }
+      
+      return total / (data.length / 4);
+    } catch (err) {
+      return 0;
+    }
   }
 
   async captureCameraSnapshot() {
@@ -169,6 +376,13 @@ class ExamInterface {
     document.getElementById('submitQBtn').addEventListener('click', () => this.nextQuestion());
     document.getElementById('submitExamBtn').addEventListener('click', () => this.submitExam());
     document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+    
+    // Dark mode toggle
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => this.toggleDarkMode());
+    }
+    
     document.getElementById('closeWarningBtn').addEventListener('click', (e) => {
       e.target.parentElement.style.display = 'none';
     });
@@ -474,24 +688,40 @@ class ExamInterface {
     }
   }
 
-  showError(message) {
-    let errorEl = document.getElementById('errorToast');
-    if (!errorEl) {
-      errorEl = document.createElement('div');
-      errorEl.id = 'errorToast';
-      errorEl.style.cssText = `
+  showToast(message, type = 'info') {
+    const colors = {
+      success: '#28a745',
+      error: '#dc3545',
+      warning: '#ffc107',
+      info: '#17a2b8'
+    };
+
+    let toastEl = document.getElementById('toastNotification');
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.id = 'toastNotification';
+      toastEl.style.cssText = `
         position: fixed; top: 20px; right: 20px; max-width: 400px;
-        background: #dc3545; color: white; padding: 15px; border-radius: 5px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10001;
-        font-family: Arial, sans-serif; font-size: 14px;
+        padding: 15px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 10001; font-family: Arial, sans-serif; font-size: 14px;
+        transition: all 0.3s ease; color: white;
       `;
-      document.body.appendChild(errorEl);
+      document.body.appendChild(toastEl);
     }
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
+
+    toastEl.textContent = message;
+    toastEl.style.backgroundColor = colors[type] || colors.info;
+    toastEl.style.display = 'block';
+
+    // Auto-hide after 3 seconds for non-error toasts
+    const timeout = type === 'error' ? 5000 : 3000;
     setTimeout(() => {
-      errorEl.style.display = 'none';
-    }, 5001);
+      toastEl.style.display = 'none';
+    }, timeout);
+  }
+
+  showError(message) {
+    this.showToast(message, 'error');
   }
 
   logout() {
@@ -499,6 +729,24 @@ class ExamInterface {
       clearAuth();
       window.location.href = '/login.html';
     }
+  }
+
+  toggleDarkMode() {
+    const body = document.body;
+    const themeToggle = document.getElementById('themeToggle');
+    
+    body.classList.toggle('dark-mode');
+    const isDark = body.classList.contains('dark-mode');
+    
+    // Update toggle button icon
+    themeToggle.textContent = isDark ? '☀️' : '🌙';
+    themeToggle.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    
+    // Save preference
+    localStorage.setItem('darkMode', isDark);
+    
+    // Log activity
+    this.logActivity('theme_toggle', { darkMode: isDark });
   }
 }
 

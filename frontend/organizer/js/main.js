@@ -14,6 +14,15 @@ class OrganizerDashboard {
     if (!checkAuth()) return;
 
     const user = getUser();
+    console.log('Organizer dashboard - User:', user);
+    
+    if (user.role !== 'organizer') {
+      alert('Access denied. Only organizers can access this page. Your role: ' + user.role);
+      clearAuth();
+      window.location.href = '/login.html';
+      return;
+    }
+
     document.getElementById('userName').textContent = user.fullName;
 
     this.showLoading('Initializing dashboard...');
@@ -81,10 +90,6 @@ class OrganizerDashboard {
     // Add question button
     document.getElementById('addQuestionBtn')?.addEventListener('click', () => {
       this.openQuestionForm();
-    });
-
-    document.getElementById('questionType')?.addEventListener('change', (e) => {
-      document.getElementById('mcqContainer').style.display = e.target.value === 'mcq' ? 'block' : 'none';
     });
 
     document.getElementById('addOptionBtn')?.addEventListener('click', () => {
@@ -195,6 +200,7 @@ class OrganizerDashboard {
         <div>
           <button class="btn-action" onclick="dashboard.editExam(${exam.id})">Edit</button>
           <button class="btn-action" onclick="dashboard.manageQuestions(${exam.id})">Questions</button>
+          <button class="btn-action" onclick="dashboard.manageEnrollments(${exam.id})">Enroll</button>
         </div>
         <div>
           <button class="btn-action btn-delete" onclick="dashboard.deleteExam(${exam.id})">Delete</button>
@@ -293,13 +299,33 @@ class OrganizerDashboard {
   async saveExam(e) {
     e.preventDefault();
 
+    const user = getUser();
+    const token = getToken();
+    console.log('Save exam - User:', user);
+    console.log('Save exam - Token exists:', !!token);
+
+    if (!user || user.role !== 'organizer') {
+      alert('You must be logged in as an organizer to create exams.');
+      return;
+    }
+
     const data = {
       title: document.getElementById('examTitle').value,
       description: document.getElementById('examDescription').value,
       duration: parseInt(document.getElementById('examDuration').value),
       totalMarks: parseInt(document.getElementById('examTotalMarks').value),
       passingMarks: parseInt(document.getElementById('examPassingMarks').value),
-      instructions: document.getElementById('examInstructions').value
+      instructions: document.getElementById('examInstructions').value,
+      weightage: parseFloat(document.getElementById('examWeightage').value) || 1.0,
+      rules: document.getElementById('examRules').value,
+      shuffleQuestions: document.getElementById('shuffleQuestions').checked,
+      shuffleOptions: document.getElementById('shuffleOptions').checked,
+      allowReview: document.getElementById('allowReview').checked,
+      showResultsImmediately: document.getElementById('showResultsImmediately').checked,
+      maxAttempts: parseInt(document.getElementById('examMaxAttempts').value) || 1,
+      startDate: document.getElementById('examStartDate').value || null,
+      endDate: document.getElementById('examEndDate').value || null,
+      accessCode: document.getElementById('examAccessCode').value || null
     };
 
     try {
@@ -308,10 +334,14 @@ class OrganizerDashboard {
         alert('Exam updated successfully');
       } else {
         const result = await apiCall('/exams', 'POST', data);
-        alert('Exam created successfully');
+        // After creating exam, open question management
+        this.currentExam = { id: result.examId, ...data };
+        document.getElementById('examModal').style.display = 'none';
+        document.getElementById('questionModal').style.display = 'flex';
+        this.loadQuestions(result.examId);
+        alert('Exam created successfully! Now add questions.');
       }
 
-      document.getElementById('examModal').style.display = 'none';
       await this.loadExams();
       this.loadDashboardStats();
       if (document.getElementById('examsView').classList.contains('active')) {
@@ -342,6 +372,75 @@ class OrganizerDashboard {
     this.loadQuestions(examId);
   }
 
+  manageEnrollments(examId) {
+    this.currentExam = this.exams.find(e => e.id === examId);
+    document.getElementById('enrollmentExamTitle').textContent = this.currentExam.title;
+    document.getElementById('enrollmentModal').style.display = 'flex';
+    this.loadEnrolledStudents(examId);
+  }
+
+  async loadEnrolledStudents(examId) {
+    try {
+      const students = await apiCall(`/exams/${examId}/students`);
+      const container = document.getElementById('enrolledStudentsList');
+      container.innerHTML = '';
+
+      students.forEach(student => {
+        const item = document.createElement('div');
+        item.className = 'student-item';
+        item.innerHTML = `
+          <div>
+            <div class="student-name">${student.fullName}</div>
+            <div class="student-email">${student.email}</div>
+          </div>
+          <button class="btn-action btn-delete" onclick="dashboard.removeEnrollment(${examId}, ${student.id})">Remove</button>
+        `;
+        container.appendChild(item);
+      });
+
+      // Update enrolled count
+      document.getElementById('enrolledCount').textContent = students.length;
+    } catch (err) {
+      console.error('Failed to load enrolled students:', err);
+    }
+  }
+
+  async enrollStudent(examId) {
+    const studentEmail = document.getElementById('studentEmail').value.trim();
+    if (!studentEmail) {
+      alert('Please enter a student email');
+      return;
+    }
+
+    try {
+      // First, find student by email (we need to add this API endpoint)
+      const student = await apiCall(`/users/search?email=${encodeURIComponent(studentEmail)}`);
+      if (!student) {
+        alert('Student not found');
+        return;
+      }
+
+      await apiCall(`/exams/${examId}/enroll`, 'POST', { studentId: student.id });
+      alert('Student enrolled successfully');
+      document.getElementById('studentEmail').value = '';
+      this.loadEnrolledStudents(examId);
+    } catch (err) {
+      alert('Error enrolling student: ' + err.message);
+    }
+  }
+
+  async removeEnrollment(examId, studentId) {
+    if (!confirm('Are you sure you want to remove this student from the exam?')) return;
+
+    try {
+      await apiCall(`/exams/${examId}/enroll/${studentId}`, 'DELETE');
+      alert('Student removed successfully');
+      this.loadEnrolledStudents(examId);
+    } catch (err) {
+      alert('Error removing student: ' + err.message);
+    }
+  }
+
   async loadQuestions(examId) {
     try {
       const questions = await apiCall(`/questions/exam/${examId}`);
@@ -368,6 +467,35 @@ class OrganizerDashboard {
   openQuestionForm() {
     document.getElementById('questionForm').style.display = 'block';
     document.getElementById('questionContent').focus();
+    
+    // Reset form to default state
+    document.getElementById('questionType').value = 'mcq';
+    document.getElementById('mcqContainer').style.display = 'block'; // Show MCQ by default
+    
+    // Clear options list and add one default option
+    document.getElementById('optionsList').innerHTML = '';
+    this.addOptionInput();
+    
+    // Attach question type change listener
+    const questionTypeSelect = document.getElementById('questionType');
+    if (questionTypeSelect && !questionTypeSelect.hasAttribute('data-listener-attached')) {
+      questionTypeSelect.addEventListener('change', (e) => {
+        const isMcq = e.target.value === 'mcq';
+        const mcqContainer = document.getElementById('mcqContainer');
+        if (mcqContainer) {
+          mcqContainer.style.display = isMcq ? 'block' : 'none';
+          
+          if (isMcq) {
+            // Automatically add first option for MCQ
+            const optionsList = document.getElementById('optionsList');
+            if (optionsList && optionsList.children.length === 0) {
+              this.addOptionInput();
+            }
+          }
+        }
+      });
+      questionTypeSelect.setAttribute('data-listener-attached', 'true');
+    }
   }
 
   addOptionInput() {
@@ -404,30 +532,56 @@ class OrganizerDashboard {
 
     // Add options if MCQ
     if (type === 'mcq') {
+      const answerType = document.getElementById('mcqAnswerType').value;
+      const scoringMethod = document.getElementById('mcqScoringMethod').value;
       const optionInputs = document.querySelectorAll('.option-input');
+
       if (optionInputs.length === 0) {
         alert('Please add at least one option for MCQ');
         return;
       }
 
+      data.answerType = answerType;
+      data.scoringMethod = scoringMethod;
       data.options = [];
+
+      let correctCount = 0;
       optionInputs.forEach(input => {
         const text = input.querySelector('.option-text').value.trim();
         const isCorrect = input.querySelector('.option-correct').checked;
 
         if (text) {
           data.options.push({ text, isCorrect });
+          if (isCorrect) correctCount++;
         }
       });
+
+      // Validation based on answer type
+      if (answerType === 'single') {
+        if (correctCount !== 1) {
+          alert('Single answer questions must have exactly one correct answer');
+          return;
+        }
+      } else if (answerType === 'multiple') {
+        if (correctCount < 2) {
+          alert('Multiple answer questions must have at least two correct answers');
+          return;
+        }
+      }
     }
 
     try {
       await apiCall('/questions', 'POST', data);
       alert('Question added successfully');
 
-      // Reset form
-      document.getElementById('questionForm').reset();
+      // Reset form manually since it's not a real form element
+      document.getElementById('questionType').value = 'mcq';
+      document.getElementById('questionContent').value = '';
+      document.getElementById('questionMarks').value = '';
+      document.getElementById('mcqAnswerType').value = 'single';
+      document.getElementById('mcqScoringMethod').value = 'all-or-nothing';
       document.getElementById('optionsList').innerHTML = '';
+      document.getElementById('mcqContainer').style.display = 'none';
       document.getElementById('questionForm').style.display = 'none';
 
       // Reload questions

@@ -3,26 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Secure online examination platform with anti-cheating features">
+  <meta name="theme-color" content="#2563eb">
   <title>ProExam - Student Exam Interface</title>
+  <link rel="preconnect" href="http://localhost:8000">
+  <link rel="dns-prefetch" href="//fonts.googleapis.com">
   <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js" defer></script>
+  <script src="js/antiCheating.js" defer></script>
+  <script src="js/examInterface.js" defer></script>
+  <script>
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('../sw.js')
+          .then(registration => {
+            console.log('ServiceWorker registered successfully');
+          })
+          .catch(error => {
+            console.log('ServiceWorker registration failed:', error);
+          });
+      });
+    }
+  </script>
 </head>
 <body>
+  <!-- Skip link for accessibility -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <div class="exam-container" id="examContainer">
     <!-- Header -->
     <header class="exam-header">
       <div class="header-left">
         <h2 id="examTitle">Exam Title</h2>
-        <div class="exam-info">
+        <div class="exam-info" aria-live="polite">
           <span id="currentQuestion">Question: 1</span>
           <span id="totalQuestions">of 0</span>
         </div>
       </div>
       <div class="header-middle">
-        <div class="timer" id="timer">00:00:00</div>
-        <div class="timer-status" id="timerStatus"></div>
+        <div class="timer" id="timer" aria-live="polite" aria-label="Exam timer">00:00:00</div>
+        <div class="timer-status" id="timerStatus" aria-live="assertive"></div>
       </div>
       <div class="header-right">
-        <button class="btn-logout" id="logoutBtn">Logout</button>
+        <button class="btn-theme-toggle" id="themeToggle" title="Toggle Dark Mode" aria-label="Toggle between light and dark theme">
+          <span class="theme-icon">🌙</span>
+        </button>
+        <button class="btn-logout" id="logoutBtn" aria-label="Logout from exam">Logout</button>
       </div>
     </header>
 
@@ -41,38 +68,39 @@
     </div>
 
     <!-- Main Content -->
-    <div class="exam-content">
+    <main class="exam-content" id="main-content">
       <!-- Question Navigation -->
-      <aside class="question-panel">
+      <aside class="question-panel" role="navigation" aria-label="Question navigation">
         <div class="panel-header">
           <h3>Questions</h3>
-          <div class="filter-buttons">
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="answered">Answered</button>
-            <button class="filter-btn" data-filter="unanswered">Unanswered</button>
+          <div class="filter-buttons" role="group" aria-label="Question filters">
+            <button class="filter-btn active" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-btn" data-filter="answered" aria-pressed="false">Answered</button>
+            <button class="filter-btn" data-filter="unanswered" aria-pressed="false">Unanswered</button>
           </div>
         </div>
         <div class="questions-list" id="questionsList"></div>
       </aside>
 
       <!-- Question Display -->
-      <main class="question-area">
+      <section class="question-area" role="main" aria-label="Current question">
         <div class="question-content">
-          <h3 id="questionNumber">Question 1</h3>
-          <div class="question-text" id="questionText">Loading question...</div>
+          <h3 id="questionNumber" aria-live="polite">Question 1</h3>
+          <div class="question-text" id="questionText" aria-live="polite">Loading question...</div>
 
           <!-- MCQ Options -->
-          <div id="mcqOptions" class="mcq-options" style="display: none;"></div>
+          <div id="mcqOptions" class="mcq-options" style="display: none;" role="radiogroup" aria-label="Multiple choice options"></div>
 
           <!-- Descriptive Answer -->
           <div id="descriptiveAnswer" class="descriptive-answer" style="display: none;">
-            <textarea id="answerTextarea" placeholder="Type your answer here..." rows="8"></textarea>
+            <label for="answerTextarea" class="sr-only">Your answer</label>
+            <textarea id="answerTextarea" placeholder="Type your answer here..." rows="8" aria-label="Descriptive answer input"></textarea>
           </div>
 
           <!-- Question Navigation Buttons -->
-          <div class="navigation-buttons">
-            <button class="btn-nav" id="prevBtn">← Previous</button>
-            <button class="btn-submit-q" id="submitQBtn">Save & Next</button>
+          <div class="navigation-buttons" role="group" aria-label="Question navigation">
+            <button class="btn-nav" id="prevBtn" aria-label="Go to previous question">← Previous</button>
+            <button class="btn-submit-q" id="submitQBtn" aria-label="Save answer and go to next question">Save & Next</button>
           </div>
         </div>
 
@@ -96,10 +124,5 @@
       </div>
     </div>
   </div>
-
-  <!-- Anti-cheating detection script -->
-  <script src="../js/config.js"></script>
-  <script src="js/antiCheating.js"></script>
-  <script src="js/examInterface.js"></script>
 </body>
 </html>

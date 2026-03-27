@@ -134,41 +134,113 @@
       </div>
 
       <form id="examForm">
-        <div class="form-group">
-          <label for="examTitle">Exam Title *</label>
-          <input type="text" id="examTitle" required>
-        </div>
-
-        <div class="form-group">
-          <label for="examDescription">Description</label>
-          <textarea id="examDescription" rows="3"></textarea>
-        </div>
-
-        <div class="form-row">
+        <!-- Basic Information -->
+        <div class="form-section">
+          <h4>Basic Information</h4>
           <div class="form-group">
-            <label for="examDuration">Duration (minutes) *</label>
-            <input type="number" id="examDuration" min="1" required>
+            <label for="examTitle">Exam Title *</label>
+            <input type="text" id="examTitle" required>
           </div>
 
           <div class="form-group">
-            <label for="examTotalMarks">Total Marks *</label>
-            <input type="number" id="examTotalMarks" min="1" required>
+            <label for="examDescription">Description</label>
+            <textarea id="examDescription" rows="3"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="examDuration">Duration (minutes) *</label>
+              <input type="number" id="examDuration" min="1" required>
+            </div>
+
+            <div class="form-group">
+              <label for="examTotalMarks">Total Marks *</label>
+              <input type="number" id="examTotalMarks" min="1" required>
+            </div>
+
+            <div class="form-group">
+              <label for="examPassingMarks">Passing Marks *</label>
+              <input type="number" id="examPassingMarks" min="0" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="examWeightage">Weightage</label>
+              <input type="number" id="examWeightage" min="0.1" max="10" step="0.1" value="1.0" placeholder="1.0">
+            </div>
+
+            <div class="form-group">
+              <label for="examMaxAttempts">Max Attempts</label>
+              <input type="number" id="examMaxAttempts" min="1" max="10" value="1">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="examStartDate">Start Date/Time</label>
+              <input type="datetime-local" id="examStartDate">
+            </div>
+
+            <div class="form-group">
+              <label for="examEndDate">End Date/Time</label>
+              <input type="datetime-local" id="examEndDate">
+            </div>
           </div>
 
           <div class="form-group">
-            <label for="examPassingMarks">Passing Marks *</label>
-            <input type="number" id="examPassingMarks" min="0" required>
+            <label for="examAccessCode">Access Code (Optional)</label>
+            <input type="text" id="examAccessCode" placeholder="Leave empty for no access code">
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="examInstructions">Instructions</label>
-          <textarea id="examInstructions" rows="4" placeholder="Special instructions for students..."></textarea>
+        <!-- Rules and Instructions -->
+        <div class="form-section">
+          <h4>Rules and Instructions</h4>
+          <div class="form-group">
+            <label for="examRules">Additional Rules</label>
+            <textarea id="examRules" rows="3" placeholder="Additional rules and regulations..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="examInstructions">Instructions</label>
+            <textarea id="examInstructions" rows="4" placeholder="Special instructions for students..."></textarea>
+          </div>
+        </div>
+
+        <!-- Exam Settings -->
+        <div class="form-section">
+          <h4>Exam Settings</h4>
+          <div class="form-check-group">
+            <label class="form-check">
+              <input type="checkbox" id="shuffleQuestions">
+              <span class="checkmark"></span>
+              Shuffle Questions
+            </label>
+
+            <label class="form-check">
+              <input type="checkbox" id="shuffleOptions">
+              <span class="checkmark"></span>
+              Shuffle Answer Options
+            </label>
+
+            <label class="form-check">
+              <input type="checkbox" id="allowReview" checked>
+              <span class="checkmark"></span>
+              Allow Reviewing Answers
+            </label>
+
+            <label class="form-check">
+              <input type="checkbox" id="showResultsImmediately">
+              <span class="checkmark"></span>
+              Show Results Immediately After Completion
+            </label>
+          </div>
         </div>
 
         <div class="button-group">
           <button type="button" class="btn-cancel">Cancel</button>
-          <button type="submit" class="btn-primary">Save Exam</button>
+          <button type="submit" class="btn-primary">Create Exam & Add Questions</button>
         </div>
       </form>
     </div>
@@ -211,14 +283,60 @@
 
         <div id="mcqContainer" style="display: none;">
           <h5>Multiple Choice Options</h5>
-          <div id="optionsList"></div>
-          <button type="button" id="addOptionBtn" class="btn-secondary">+ Add Option</button>
+          
+          <div class="form-group">
+            <label for="mcqAnswerType">Answer Type *</label>
+            <select id="mcqAnswerType" required>
+              <option value="single">Single Answer (Radio buttons)</option>
+              <option value="multiple">Multiple Answers (Checkboxes)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Scoring Method (for Multiple Answers)</label>
+            <select id="mcqScoringMethod">
+              <option value="all-or-nothing">All correct answers required</option>
+              <option value="partial">Partial marks for correct answers</option>
+            </select>
+            <small class="form-hint">Only applies when multiple answers are allowed</small>
+          </div>
+
+          <div class="options-section">
+            <label>Answer Options *</label>
+            <div id="optionsList"></div>
+            <button type="button" id="addOptionBtn" class="btn-secondary">+ Add Option</button>
+            <small class="form-hint">Check the box next to correct answer(s)</small>
+          </div>
         </div>
 
         <div class="button-group">
           <button type="button" id="cancelQuestionBtn" class="btn-cancel">Cancel</button>
           <button type="button" id="saveQuestionBtn" class="btn-primary">Save Question</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enrollment Management Modal -->
+  <div id="enrollmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Manage Enrollments</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+
+      <div class="enrollment-management">
+        <div class="enrollment-header">
+          <h4 id="enrollmentExamTitle">Exam Title</h4>
+          <p>Enrolled Students: <span id="enrolledCount">0</span></p>
+        </div>
+
+        <div class="enroll-student">
+          <input type="email" id="studentEmail" placeholder="Enter student email to enroll">
+          <button class="btn-primary" onclick="dashboard.enrollStudent(dashboard.currentExam.id)">Enroll Student</button>
+        </div>
+
+        <div id="enrolledStudentsList" class="enrolled-students-list"></div>
       </div>
     </div>
   </div>

@@ -5,6 +5,8 @@ class StudentExamList {
   constructor() {
     this.exams = [];
     this.sessions = [];
+    this.selectedExam = null;
+    this.cameraStream = null;
 
     this.init();
   }
@@ -13,6 +15,13 @@ class StudentExamList {
     if (!checkAuth()) return;
 
     const user = getUser();
+    if (user.role !== 'student') {
+      alert('Access denied. Only students can access this page.');
+      clearAuth();
+      window.location.href = '/login.html';
+      return;
+    }
+
     console.log('Student user:', user);
 
     this.setupEventListeners();
@@ -30,8 +39,8 @@ class StudentExamList {
 
   async loadAvailableExams() {
     try {
-      // Get all exams (in production, would filter by enrollment)
-      const exams = await apiCall('/exams');
+      // Get enrolled exams for the student
+      const exams = await apiCall('/exams/enrolled');
       this.exams = exams;
 
       this.renderExams();
@@ -103,13 +112,90 @@ class StudentExamList {
     const exam = this.exams.find(e => e.id === examId);
     if (!exam) return;
 
-    // Confirm starting exam
-    if (!confirm(`Start "${exam.title}"? This exam requires fullscreen mode and has strict anti-cheating measures.`)) {
-      return;
-    }
+    this.selectedExam = exam;
+    
+    // Show rules modal first
+    document.getElementById('rulesModal').style.display = 'flex';
+  }
 
+  cancelExamStart() {
+    // Hide all modals and reset state
+    document.getElementById('rulesModal').style.display = 'none';
+    document.getElementById('cameraModal').style.display = 'none';
+    document.getElementById('fullscreenModal').style.display = 'none';
+    
+    // Stop camera if it's running
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(track => track.stop());
+      this.cameraStream = null;
+    }
+    
+    this.selectedExam = null;
+  }
+
+  async proceedToCamera() {
+    // Hide rules modal and show camera modal
+    document.getElementById('rulesModal').style.display = 'none';
+    document.getElementById('cameraModal').style.display = 'flex';
+    
+    // Request camera permission
+    await this.requestCameraPermission();
+  }
+
+  async requestCameraPermission() {
+    const videoElement = document.getElementById('cameraPreview');
+    const statusElement = document.getElementById('cameraPreviewStatus');
+    const continueBtn = document.getElementById('cameraContinueBtn');
+    
+    try {
+      statusElement.textContent = 'Requesting camera permission...';
+      continueBtn.disabled = true;
+      
+      this.cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        },
+        audio: false
+      });
+      
+      videoElement.srcObject = this.cameraStream;
+      statusElement.textContent = 'Camera ready! ✓';
+      statusElement.style.color = '#4caf50';
+      continueBtn.disabled = false;
+      
+    } catch (err) {
+      console.error('Camera permission denied:', err);
+      statusElement.textContent = 'Camera access denied. Please allow camera access and try again.';
+      statusElement.style.color = '#f44336';
+      
+      // Show instructions for enabling camera
+      setTimeout(() => {
+        alert('Camera access is required for the exam. Please:\n1. Click the camera icon in the address bar\n2. Allow camera access\n3. Try again');
+        this.requestCameraPermission();
+      }, 2000);
+    }
+  }
+
+  proceedToFullscreen() {
+    // Hide camera modal and show fullscreen modal
+    document.getElementById('cameraModal').style.display = 'none';
+    document.getElementById('fullscreenModal').style.display = 'flex';
+  }
+
+  async startActualExam() {
+    // Hide fullscreen modal
+    document.getElementById('fullscreenModal').style.display = 'none';
+    
+    // Stop the preview camera stream (exam interface will start its own)
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(track => track.stop());
+      this.cameraStream = null;
+    }
+    
     // Redirect to exam interface
-    window.location.href = `/student/index.html?examId=${examId}`;
+    window.location.href = `/student/index.html?examId=${this.selectedExam.id}`;
   }
 }
 

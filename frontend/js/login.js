@@ -207,7 +207,7 @@ function setLoading(loading) {
 
 function redirectToRole(role) {
   if (role === ROLE_STUDENT) {
-    window.location.href = '/student/';
+    window.location.href = '/student/examList.html';
   } else if (role === ROLE_ORGANIZER) {
     window.location.href = '/organizer/';
   }

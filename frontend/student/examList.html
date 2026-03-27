@@ -29,7 +29,116 @@
     </main>
   </div>
 
+  <!-- Exam Rules Modal -->
+  <div id="rulesModal" class="modal" style="display: none;">
+    <div class="modal-content rules-modal">
+      <div class="modal-header">
+        <h3>Exam Rules & Instructions</h3>
+      </div>
+
+      <div class="rules-content">
+        <div class="rules-section">
+          <h4>📋 General Rules</h4>
+          <ul>
+            <li>You must complete the exam within the allocated time</li>
+            <li>Once submitted, you cannot change your answers</li>
+            <li>Any violation of rules may result in disqualification</li>
+          </ul>
+        </div>
+
+        <div class="rules-section">
+          <h4>📷 Proctoring Requirements</h4>
+          <ul>
+            <li>Camera must remain on throughout the exam</li>
+            <li>You must stay in fullscreen mode</li>
+            <li>Face must be clearly visible at all times</li>
+            <li>No other persons should be visible in the camera</li>
+          </ul>
+        </div>
+
+        <div class="rules-section">
+          <h4>🚫 Prohibited Actions</h4>
+          <ul>
+            <li>Switching tabs or applications</li>
+            <li>Using mobile phones or other devices</li>
+            <li>Looking away from the screen for extended periods</li>
+            <li>Opening developer tools or inspecting elements</li>
+            <li>Right-clicking or copying content</li>
+          </ul>
+        </div>
+
+        <div class="rules-section">
+          <h4>⚠️ Violations & Consequences</h4>
+          <ul>
+            <li><strong>Warning:</strong> First violation - visual warning</li>
+            <li><strong>Auto-submit:</strong> Multiple violations - exam submitted automatically</li>
+            <li><strong>Disqualification:</strong> Severe violations - exam marked as invalid</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
+        <button class="btn-primary" onclick="studentExamList.proceedToCamera()">I Understand - Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Permission Modal -->
+  <div id="cameraModal" class="modal" style="display: none;">
+    <div class="modal-content camera-modal">
+      <div class="modal-header">
+        <h3>Camera Setup</h3>
+      </div>
+
+      <div class="camera-setup">
+        <p>We need access to your camera for proctoring purposes.</p>
+        <div class="camera-preview">
+          <video id="cameraPreview" autoplay muted playsinline></video>
+          <p class="camera-status" id="cameraPreviewStatus">Initializing camera...</p>
+        </div>
+        <div class="camera-instructions">
+          <h4>Camera Requirements:</h4>
+          <ul>
+            <li>Ensure good lighting</li>
+            <li>Position camera to show your face clearly</li>
+            <li>Keep camera stable throughout the exam</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
+        <button class="btn-primary" id="cameraContinueBtn" onclick="studentExamList.proceedToFullscreen()" disabled>Continue to Exam</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Modal -->
+  <div id="fullscreenModal" class="modal" style="display: none;">
+    <div class="modal-content fullscreen-modal">
+      <div class="modal-header">
+        <h3>Enter Fullscreen Mode</h3>
+      </div>
+
+      <div class="fullscreen-setup">
+        <p>The exam will now enter fullscreen mode. This is required for the examination.</p>
+        <div class="fullscreen-notice">
+          <h4>⚠️ Important:</h4>
+          <ul>
+            <li>Do not exit fullscreen mode during the exam</li>
+            <li>Exiting fullscreen will be recorded as a violation</li>
+            <li>Multiple violations may result in automatic submission</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
+        <button class="btn-primary" onclick="studentExamList.startActualExam()">Start Exam</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="js/examList.js"></script>
-</body>
-</html>

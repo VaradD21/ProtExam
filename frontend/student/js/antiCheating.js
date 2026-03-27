@@ -10,6 +10,8 @@ class AntiCheatSystem {
     this.isFullscreen = false;
     this.inactivityTimer = null;
     this.inactivityTimeout = 60000; // 1 minute
+    this.fullscreenExitCount = 0;
+    this.fullscreenExitWarnings = 0;
 
     this.initializeDetection();
   }
@@ -60,14 +62,46 @@ class AntiCheatSystem {
 
         if (!isCurrentlyFullscreen && this.isFullscreen) {
           // Exited fullscreen
-          this.logViolation('fullscreen_exit', { timestamp: Date.now() }, 'high');
+          this.fullscreenExitCount++;
+          this.logViolation('fullscreen_exit', {
+            timestamp: Date.now(),
+            exitCount: this.fullscreenExitCount
+          }, 'high');
+
+          this.handleFullscreenExit();
           this.isFullscreen = false;
         } else if (isCurrentlyFullscreen && !this.isFullscreen) {
           // Entered fullscreen
           this.isFullscreen = true;
+          this.fullscreenExitWarnings = 0; // Reset warnings when entering fullscreen
         }
       });
     });
+  }
+
+  handleFullscreenExit() {
+    this.fullscreenExitWarnings++;
+
+    if (this.fullscreenExitWarnings === 1) {
+      this.showWarning('Warning: You exited full screen mode. Please return to full screen to continue the exam.');
+      // Try to re-enter fullscreen
+      setTimeout(() => {
+        this.requestFullscreen();
+      }, 2000);
+    } else if (this.fullscreenExitWarnings === 2) {
+      this.showWarning('Second warning: You exited full screen mode again. One more exit will result in automatic exam submission.');
+      setTimeout(() => {
+        this.requestFullscreen();
+      }, 2000);
+    } else if (this.fullscreenExitWarnings >= 3) {
+      this.showError('Third fullscreen exit detected. Exam will be submitted automatically.');
+      // Auto-submit the exam
+      setTimeout(() => {
+        if (window.examInterface) {
+          window.examInterface.submitExam(true);
+        }
+      }, 3000);
+    }
   }
 
   // Detect tab switching using visibilitychange API

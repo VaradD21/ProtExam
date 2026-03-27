@@ -202,6 +202,209 @@ body {
   background: #45a049;
 }
 
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  color: #333;
+  font-size: 24px;
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel {
+  padding: 12px 24px;
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.btn-cancel:hover {
+  background: #e0e0e0;
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #5a67d8;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Rules Modal */
+.rules-content {
+  padding: 20px;
+}
+
+.rules-section {
+  margin-bottom: 20px;
+}
+
+.rules-section h4 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.rules-section ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rules-section li {
+  padding: 5px 0;
+  padding-left: 20px;
+  position: relative;
+  color: #555;
+}
+
+.rules-section li:before {
+  content: "•";
+  color: #667eea;
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+}
+
+/* Camera Modal */
+.camera-setup {
+  padding: 20px;
+  text-align: center;
+}
+
+.camera-preview {
+  margin: 20px 0;
+}
+
+#cameraPreview {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 8px;
+  border: 2px solid #eee;
+}
+
+.camera-status {
+  margin: 10px 0;
+  font-weight: bold;
+  color: #666;
+}
+
+.camera-instructions {
+  text-align: left;
+  margin-top: 20px;
+}
+
+.camera-instructions h4 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.camera-instructions ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.camera-instructions li {
+  padding: 5px 0;
+  padding-left: 20px;
+  position: relative;
+  color: #555;
+}
+
+.camera-instructions li:before {
+  content: "✓";
+  color: #4caf50;
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+}
+
+/* Fullscreen Modal */
+.fullscreen-setup {
+  padding: 20px;
+  text-align: center;
+}
+
+.fullscreen-notice {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.fullscreen-notice h4 {
+  color: #856404;
+  margin-bottom: 10px;
+}
+
+.fullscreen-notice ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.fullscreen-notice li {
+  padding: 5px 0;
+  padding-left: 20px;
+  position: relative;
+  color: #856404;
+}
+
+.fullscreen-notice li:before {
+  content: "⚠️";
+  position: absolute;
+  left: 0;
+}
+
 .empty-state {
   text-align: center;
   color: white;
