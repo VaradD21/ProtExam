@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const MigrationManager = require('../utils/migrationManager');
 
 const dbPath = path.join(__dirname, '../data/protexam.db');
 
@@ -18,136 +19,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 db.configure('busyTimeout', 10000);
 
-// Initialize database schema
-const initializeDatabase = () => {
-  db.serialize(() => {
-    // Users table
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      fullName TEXT NOT NULL,
-      role TEXT NOT NULL,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      isActive BOOLEAN DEFAULT 1
-    )`);
-
-    // Exams table
-    db.run(`CREATE TABLE IF NOT EXISTS exams (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      organizerId INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      duration INTEGER NOT NULL,
-      totalMarks INTEGER NOT NULL,
-      passingMarks INTEGER NOT NULL,
-      instructions TEXT,
-      status TEXT DEFAULT 'draft',
-      startTime DATETIME,
-      endTime DATETIME,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (organizerId) REFERENCES users(id)
-    )`);
-
-    // Questions table
-    db.run(`CREATE TABLE IF NOT EXISTS questions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      examId INTEGER NOT NULL,
-      type TEXT NOT NULL,
-      content TEXT NOT NULL,
-      marks INTEGER NOT NULL,
-      orderNum INTEGER,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (examId) REFERENCES exams(id)
-    )`);
-
-    // Question options (for MCQ)
-    db.run(`CREATE TABLE IF NOT EXISTS question_options (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      questionId INTEGER NOT NULL,
-      optionText TEXT NOT NULL,
-      isCorrect BOOLEAN DEFAULT 0,
-      FOREIGN KEY (questionId) REFERENCES questions(id)
-    )`);
-
-    // Student enrollments
-    db.run(`CREATE TABLE IF NOT EXISTS enrollments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      examId INTEGER NOT NULL,
-      studentId INTEGER NOT NULL,
-      enrolledAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (examId) REFERENCES exams(id),
-      FOREIGN KEY (studentId) REFERENCES users(id)
-    )`);
-
-    // Exam sessions
-    db.run(`CREATE TABLE IF NOT EXISTS exam_sessions (
-      id TEXT PRIMARY KEY,
-      examId INTEGER NOT NULL,
-      studentId INTEGER NOT NULL,
-      startTime DATETIME DEFAULT CURRENT_TIMESTAMP,
-      endTime DATETIME,
-      status TEXT DEFAULT 'active',
-      totalViolations INTEGER DEFAULT 0,
-      suspicionScore REAL DEFAULT 0,
-      FOREIGN KEY (examId) REFERENCES exams(id),
-      FOREIGN KEY (studentId) REFERENCES users(id)
-    )`);
-
-    // Student answers/submissions
-    db.run(`CREATE TABLE IF NOT EXISTS submissions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId TEXT NOT NULL,
-      questionId INTEGER NOT NULL,
-      answer TEXT,
-      marks INTEGER DEFAULT 0,
-      isAutoGraded BOOLEAN DEFAULT 0,
-      isManuallyGraded BOOLEAN DEFAULT 0,
-      gradedBy INTEGER,
-      feedback TEXT,
-      firstAnswerTime INTEGER,
-      lastAnswerTime INTEGER,
-      changeCount INTEGER DEFAULT 0,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (sessionId) REFERENCES exam_sessions(id),
-      FOREIGN KEY (questionId) REFERENCES questions(id),
-      FOREIGN KEY (gradedBy) REFERENCES users(id)
-    )`);
-
-    // Student activity logs
-    db.run(`CREATE TABLE IF NOT EXISTS activity_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId TEXT NOT NULL,
-      eventType TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      details TEXT,
-      FOREIGN KEY (sessionId) REFERENCES exam_sessions(id)
-    )`);
-
-    // Anti-cheating violation logs
-    db.run(`CREATE TABLE IF NOT EXISTS violation_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId TEXT NOT NULL,
-      violationType TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      details TEXT,
-      severity TEXT DEFAULT 'low',
-      FOREIGN KEY (sessionId) REFERENCES exam_sessions(id)
-    )`);
-
-    // Camera snapshots for remote proctoring
-    db.run(`CREATE TABLE IF NOT EXISTS camera_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sessionId TEXT NOT NULL,
-      imageData TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (sessionId) REFERENCES exam_sessions(id)
-    )`);
-
-    console.log('Database schema initialized');
-  });
+// Initialize database with migrations
+const initializeDatabase = async () => {
+  try {
+    const migrationManager = new MigrationManager();
+    await migrationManager.runMigrations();
+    console.log('Database initialized with migrations');
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    throw error;
+  }
 };
 
 // User operations
@@ -171,11 +52,28 @@ const getUserById = (id, callback) => {
 };
 
 // Exam operations
-const createExam = (organizerId, title, description, duration, totalMarks, passingMarks, instructions, callback) => {
+const createExam = (organizerId, title, description, duration, totalMarks, passingMarks, instructions, options = {}, callback) => {
+  const {
+    weightage = 1.0,
+    rules = null,
+    shuffleQuestions = false,
+    shuffleOptions = false,
+    allowReview = true,
+    showResultsImmediately = false,
+    maxAttempts = 1,
+    startDate = null,
+    endDate = null,
+    accessCode = null
+  } = options;
+
   db.run(
-    `INSERT INTO exams (organizerId, title, description, duration, totalMarks, passingMarks, instructions) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [organizerId, title, description, duration, totalMarks, passingMarks, instructions],
+    `INSERT INTO exams (organizerId, title, description, duration, totalMarks, passingMarks, instructions, status,
+                        weightage, rules, shuffle_questions, shuffle_options, allow_review, show_results_immediately,
+                        max_attempts, start_date, end_date, access_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [organizerId, title, description, duration, totalMarks, passingMarks, instructions, 'active',
+     weightage, rules, shuffleQuestions, shuffleOptions, allowReview, showResultsImmediately,
+     maxAttempts, startDate, endDate, accessCode],
     function(err) {
       callback(err, { id: this.lastID });
     }
@@ -267,6 +165,19 @@ const getEnrolledStudents = (examId, callback) => {
      INNER JOIN enrollments e ON u.id = e.studentId 
      WHERE e.examId = ?`,
     [examId],
+    callback
+  );
+};
+
+const getEnrolledExams = (studentId, callback) => {
+  db.all(
+    `SELECT e.*, ex.title, ex.description, ex.duration_minutes, ex.total_questions, 
+            ex.passing_score, ex.instructions, ex.start_date, ex.end_date
+     FROM enrollments en
+     INNER JOIN exams ex ON en.exam_id = ex.id
+     WHERE en.student_id = ? AND en.status = 'enrolled'
+     ORDER BY ex.start_date DESC`,
+    [studentId],
     callback
   );
 };
@@ -432,6 +343,7 @@ module.exports = {
   getQuestionOptions,
   enrollStudent,
   getEnrolledStudents,
+  getEnrolledExams,
   createExamSession,
   getExamSession,
   updateExamSession,

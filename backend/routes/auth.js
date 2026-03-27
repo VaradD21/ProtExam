@@ -91,4 +91,44 @@ router.get('/me', (req, res) => {
   }
 });
 
+// Search users by email (organizer only)
+router.get('/users/search', (req, res) => {
+  const { email } = req.query;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'organizer') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email parameter required' });
+    }
+
+    db.getUserByEmail(email, (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role
+      });
+    });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 module.exports = router;

@@ -5,12 +5,42 @@ const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 // Create exam (organizer only)
 router.post('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
-  const { title, description, duration, totalMarks, passingMarks, instructions } = req.body;
+  const {
+    title,
+    description,
+    duration,
+    totalMarks,
+    passingMarks,
+    instructions,
+    weightage,
+    rules,
+    shuffleQuestions,
+    shuffleOptions,
+    allowReview,
+    showResultsImmediately,
+    maxAttempts,
+    startDate,
+    endDate,
+    accessCode
+  } = req.body;
   const organizerId = req.user.id;
 
   if (!title || !duration || totalMarks === undefined || passingMarks === undefined) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+
+  const options = {
+    weightage: weightage || 1.0,
+    rules,
+    shuffleQuestions: shuffleQuestions || false,
+    shuffleOptions: shuffleOptions || false,
+    allowReview: allowReview !== false,
+    showResultsImmediately: showResultsImmediately || false,
+    maxAttempts: maxAttempts || 1,
+    startDate,
+    endDate,
+    accessCode
+  };
 
   db.createExam(
     organizerId,
@@ -20,6 +50,7 @@ router.post('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
     totalMarks,
     passingMarks,
     instructions,
+    options,
     (err, result) => {
       if (err) {
         return res.status(500).json({ error: 'Failed to create exam' });
@@ -36,6 +67,18 @@ router.get('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
   db.getExamsByOrganizer(organizerId, (err, exams) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to fetch exams' });
+    }
+    res.json(exams || []);
+  });
+});
+
+// Get enrolled exams for student
+router.get('/enrolled', authMiddleware, roleMiddleware(['student']), (req, res) => {
+  const studentId = req.user.id;
+
+  db.getEnrolledExams(studentId, (err, exams) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to fetch enrolled exams' });
     }
     res.json(exams || []);
   });
