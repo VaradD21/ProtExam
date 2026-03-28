@@ -12,7 +12,8 @@
     "lint": "eslint **/*.js",
     "lint:fix": "eslint **/*.js --fix",
     "migrate": "node scripts/migrate.js",
-    "setup": "npm install && npm run migrate && echo 'Setup complete. Run npm start to launch the server.'"
+    "seed": "node scripts/seed.js",
+    "setup": "npm install && npm run migrate && npm run seed && echo 'Setup complete. Run npm start to launch the server.'"
   },
   "keywords": [
     "exam",

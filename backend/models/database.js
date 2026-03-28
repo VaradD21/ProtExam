@@ -171,11 +171,10 @@ const getEnrolledStudents = (examId, callback) => {
 
 const getEnrolledExams = (studentId, callback) => {
   db.all(
-    `SELECT e.*, ex.title, ex.description, ex.duration_minutes, ex.total_questions, 
-            ex.passing_score, ex.instructions, ex.start_date, ex.end_date
+    `SELECT ex.*, en.status AS enrollment_status
      FROM enrollments en
-     INNER JOIN exams ex ON en.exam_id = ex.id
-     WHERE en.student_id = ? AND en.status = 'enrolled'
+     INNER JOIN exams ex ON en.examId = ex.id
+     WHERE en.studentId = ? AND en.status = 'enrolled'
      ORDER BY ex.start_date DESC`,
     [studentId],
     callback

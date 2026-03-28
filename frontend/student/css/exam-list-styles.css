@@ -35,6 +35,22 @@ body {
   opacity: 0.9;
 }
 
+.welcome-message {
+  margin-top: 10px;
+  font-size: 16px;
+  color: #f5f5f5;
+}
+
+.dashboard-stats {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #e2e2e2;
+}
+
+.dashboard-stats span {
+  margin-right: 16px;
+}
+
 .btn-logout {
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.2);
@@ -80,6 +96,34 @@ body {
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.exam-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.exam-card.scheduled::before {
+  background: linear-gradient(90deg, #f39c12 0%, #e74c3c 100%);
+}
+
+.exam-card.active::before {
+  background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%);
+}
+
+.exam-card.closed::before {
+  background: linear-gradient(90deg, #95a5a6 0%, #7f8c8d 100%);
+}
+
+.exam-card.inactive::before {
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
 }
 
 .exam-card:hover {
@@ -92,6 +136,38 @@ body {
   font-size: 20px;
   margin-bottom: 12px;
   line-height: 1.4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exam-status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.exam-status-badge.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.exam-status-badge.scheduled {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.exam-status-badge.closed {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.exam-status-badge.inactive {
+  background: #e2e3e5;
+  color: #383d41;
 }
 
 .exam-description {
@@ -101,7 +177,14 @@ body {
   flex: 1;
   line-height: 1.5;
 }
-
+.countdown-text {
+  color: #f39c12;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 .exam-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
