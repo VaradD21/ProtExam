@@ -739,17 +739,29 @@ global.logger = logger;
 // Start server
 const startServer = async () => {
   try {
+    console.log('Initializing ProExam server...');
+
     // Initialize database
+    console.log('Initializing database...');
     await db.initializeDatabase();
+    console.log('Database initialized successfully');
 
     // Initialize notification templates
+    console.log('Initializing notification templates...');
     notificationManager.initializeTemplates();
+    console.log('Notification templates initialized');
 
     // Initialize backup system
+    console.log('Initializing backup system...');
     await backupManager.initialize();
+    console.log('Backup system initialized');
+
     backupManager.startScheduledBackups();
+    console.log('Scheduled backups started');
 
     const PORT = process.env.PORT || 8000;
+    console.log(`Starting server on port ${PORT}...`);
+
     server.listen(PORT, async () => {
       await logger.info('ProExam server started successfully', {
         port: PORT,
@@ -757,13 +769,14 @@ const startServer = async () => {
         version: '1.1.0'
       });
 
-      console.log(`ProExam server running on port ${PORT}`);
-      console.log(`Organizer: http://localhost:${PORT}/organizer/`);
-      console.log(`Student: http://localhost:${PORT}/student/`);
-      console.log(`Login: http://localhost:${PORT}/login.html`);
+      console.log(`✅ ProExam server running on port ${PORT}`);
+      console.log(`📊 Organizer: http://localhost:${PORT}/organizer/`);
+      console.log(`🎓 Student: http://localhost:${PORT}/student/`);
+      console.log(`🔐 Login: http://localhost:${PORT}/login.html`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Stack trace:', error.stack);
     process.exit(1);
   }
 };

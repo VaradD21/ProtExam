@@ -3,29 +3,144 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProExam - Select Exam</title>
+  <meta name="description" content="Secure online examination platform with anti-cheating features">
+  <meta name="theme-color" content="#667eea">
+  <title>ProExam - Student Dashboard</title>
+  <link rel="preconnect" href="http://localhost:8000">
+  <link rel="dns-prefetch" href="//fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/exam-list-styles.css">
+  <script src="../js/config.js" defer></script>
+  <script src="js/examList.js" defer></script>
+  <script>
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('../sw.js')
+          .then(registration => {
+            console.log('ServiceWorker registered successfully');
+          })
+          .catch(error => {
+            console.log('ServiceWorker registration failed:', error);
+          });
+      });
+    }
+  </script>
 </head>
 <body>
+  <!-- Skip link for accessibility -->
+  <a href="#main-content" class="skip-link" aria-label="Skip to main content">Skip to main content</a>
+
   <div class="exam-list-container">
+    <!-- Header -->
     <header class="header">
       <div class="header-content">
-        <h1>ProExam</h1>
-        <p class="subtitle">Online Examination System</p>
-        <p id="welcomeMessage" class="welcome-message">Welcome, student</p>
-        <div id="dashboardStats" class="dashboard-stats"></div>
+        <h1>
+          <span class="logo-icon">🎓</span>
+          ProExam
+        </h1>
+        <p class="subtitle">Secure Online Examination Platform</p>
+        <p id="welcomeMessage" class="welcome-message">
+          <span class="welcome-icon">👋</span>
+          Welcome back, Student!
+        </p>
+        <div id="dashboardStats" class="dashboard-stats">
+          <span>
+            <span class="stat-icon">🟢</span>
+            Active: 0
+          </span>
+          <span>
+            <span class="stat-icon">⏰</span>
+            Upcoming: 0
+          </span>
+          <span>
+            <span class="stat-icon">✅</span>
+            Completed: 0
+          </span>
+          <span>
+            <span class="stat-icon">🚫</span>
+            Inactive: 0
+          </span>
+        </div>
       </div>
-      <button class="btn-logout" id="logoutBtn">Logout</button>
+      <button class="btn-logout" id="logoutBtn" aria-label="Logout from dashboard">
+        <span class="btn-icon">🚪</span>
+        Logout
+      </button>
     </header>
 
-    <main class="main-content">
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+      <!-- Quick Actions Bar -->
+      <div class="quick-actions">
+        <div class="action-card">
+          <div class="action-icon">📊</div>
+          <div class="action-content">
+            <h3>View Results</h3>
+            <p>Check your exam performance</p>
+          </div>
+        </div>
+        <div class="action-card">
+          <div class="action-icon">📅</div>
+          <div class="action-content">
+            <h3>Schedule</h3>
+            <p>See upcoming exams</p>
+          </div>
+        </div>
+        <div class="action-card">
+          <div class="action-icon">📞</div>
+          <div class="action-content">
+            <h3>Support</h3>
+            <p>Get help and assistance</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Available Exams Section -->
       <section class="exams-section">
-        <h2>Available Exams</h2>
-        <div id="examsList" class="exams-grid"></div>
+        <h2>
+          <span class="section-icon">📝</span>
+          Available Exams
+        </h2>
+        <div id="examsList" class="exams-grid">
+          <!-- Loading state -->
+          <div class="loading-card">
+            <div class="loading-skeleton">
+              <div class="skeleton-header"></div>
+              <div class="skeleton-text"></div>
+              <div class="skeleton-text short"></div>
+              <div class="skeleton-details"></div>
+              <div class="skeleton-button"></div>
+            </div>
+          </div>
+          <div class="loading-card">
+            <div class="loading-skeleton">
+              <div class="skeleton-header"></div>
+              <div class="skeleton-text"></div>
+              <div class="skeleton-text short"></div>
+              <div class="skeleton-details"></div>
+              <div class="skeleton-button"></div>
+            </div>
+          </div>
+          <div class="loading-card">
+            <div class="skeleton-header"></div>
+            <div class="loading-skeleton">
+              <div class="skeleton-header"></div>
+              <div class="skeleton-text"></div>
+              <div class="skeleton-text short"></div>
+              <div class="skeleton-details"></div>
+              <div class="skeleton-button"></div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section class="sessions-section" style="display: none;">
-        <h2>Completed Exams</h2>
+      <!-- Completed Sessions Section -->
+      <section class="sessions-section" id="completedSection" style="display: none;">
+        <h2>
+          <span class="section-icon">🏆</span>
+          Completed Exams
+        </h2>
         <div id="sessionsList" class="sessions-list"></div>
       </section>
     </main>

@@ -12,6 +12,9 @@ class StudentExamList {
   }
 
   async init() {
+    // Show loading state
+    this.showLoadingState();
+
     if (!checkAuth()) return;
 
     const user = getUser();
@@ -35,6 +38,73 @@ class StudentExamList {
         window.location.href = '/login.html';
       }
     });
+
+    // Add click handlers for quick actions
+    document.querySelectorAll('.action-card').forEach((card, index) => {
+      card.addEventListener('click', () => this.handleQuickAction(index));
+    });
+  }
+
+  showLoadingState() {
+    const container = document.getElementById('examsList');
+    container.innerHTML = `
+      <div class="loading-card">
+        <div class="loading-skeleton">
+          <div class="skeleton-header"></div>
+          <div class="skeleton-text"></div>
+          <div class="skeleton-text short"></div>
+          <div class="skeleton-details"></div>
+          <div class="skeleton-button"></div>
+        </div>
+      </div>
+      <div class="loading-card">
+        <div class="loading-skeleton">
+          <div class="skeleton-header"></div>
+          <div class="skeleton-text"></div>
+          <div class="skeleton-text short"></div>
+          <div class="skeleton-details"></div>
+          <div class="skeleton-button"></div>
+        </div>
+      </div>
+      <div class="loading-card">
+        <div class="loading-skeleton">
+          <div class="skeleton-header"></div>
+          <div class="skeleton-text"></div>
+          <div class="skeleton-text short"></div>
+          <div class="skeleton-details"></div>
+          <div class="skeleton-button"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  handleQuickAction(index) {
+    switch(index) {
+      case 0: // View Results
+        this.showCompletedExams();
+        break;
+      case 1: // Schedule
+        this.scrollToExams();
+        break;
+      case 2: // Support
+        alert('Support feature coming soon! Contact your administrator for help.');
+        break;
+    }
+  }
+
+  showCompletedExams() {
+    const completedSection = document.getElementById('completedSection');
+    if (completedSection) {
+      completedSection.style.display = 'block';
+      completedSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  scrollToExams() {
+    const examsSection = document.querySelector('.exams-section');
+    if (examsSection) {
+      examsSection.scrollIntoView({ behavior: 'smooth' });
+    }
   }
 
   async loadAvailableExams() {
@@ -149,20 +219,27 @@ class StudentExamList {
     container.innerHTML = '';
 
     if (this.exams.length === 0) {
-      container.innerHTML = '<div class="empty-state"><h3>No exams available</h3><p>Check back later for available exams</p></div>';
+      container.innerHTML = `
+        <div class="empty-state">
+          <div style="font-size: 3rem; margin-bottom: 1rem;">📝</div>
+          <h3>No exams available</h3>
+          <p>Check back later for available exams or contact your instructor</p>
+        </div>
+      `;
       return;
     }
 
-    this.exams.forEach(exam => {
+    this.exams.forEach((exam, index) => {
       const card = document.createElement('div');
       card.className = 'exam-card';
+      card.style.setProperty('--card-index', index);
 
       const duration = exam.duration || exam.duration_minutes || 0;
       const totalMarks = exam.totalMarks || exam.total_questions || exam.total_marks || 'N/A';
       const passingMarks = exam.passingMarks || exam.passing_score || exam.passing_score || 'N/A';
 
       const statusInfo = this.getExamStatus(exam);
-      const buttonText = statusInfo.isDisabled ? (statusInfo.label || 'Unavailable') : 'Start Exam';
+      const buttonText = statusInfo.isDisabled ? (statusInfo.label || 'Unavailable') : 'Start Exam 🚀';
       const statusLabel = statusInfo.label || (exam.status || 'Unknown');
 
       const startDateRaw = exam.startTime || exam.start_date;
@@ -178,12 +255,27 @@ class StudentExamList {
       const countdownText = statusInfo.state === 'scheduled' && startDateRaw ?
         this.getCountdownText(new Date(startDateRaw)) : '';
 
+      const examIcon = this.getExamIcon(exam);
+      const difficultyColor = this.getDifficultyColor(exam);
+
       card.innerHTML = `
-        <h3>
-          ${exam.title || 'Unnamed Exam'}
-          <span class="${statusBadgeClass}">${statusInfo.state || 'unknown'}</span>
-        </h3>
+        <div class="exam-header">
+          <div class="exam-icon" style="background: ${difficultyColor}">${examIcon}</div>
+          <div class="exam-meta">
+            <h3>
+              ${exam.title || 'Unnamed Exam'}
+              <span class="${statusBadgeClass}">${statusInfo.state || 'unknown'}</span>
+            </h3>
+            <div class="exam-meta-info">
+              <span class="meta-item">📚 ${exam.subject || 'General'}</span>
+              <span class="meta-item">⏱️ ${duration} min</span>
+              <span class="meta-item">🎯 ${totalMarks} marks</span>
+            </div>
+          </div>
+        </div>
+
         <p class="exam-description">${exam.description || 'No description provided.'}</p>
+
         ${countdownText ? `<p class="countdown-text">${countdownText}</p>` : ''}
 
         <div class="exam-details">
@@ -213,13 +305,41 @@ class StudentExamList {
           </div>
         </div>
 
-        <button class="btn-start" ${statusInfo.isDisabled ? 'disabled' : ''} onclick="studentExamList.startExam(${exam.id})">
+        <button class="btn-start ${statusInfo.isDisabled ? 'disabled' : ''}" ${statusInfo.isDisabled ? 'disabled' : ''} onclick="studentExamList.startExam(${exam.id})">
           ${buttonText}
         </button>
       `;
 
+      // Add click animation
+      card.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('btn-start')) {
+          card.style.transform = 'scale(0.98)';
+          setTimeout(() => {
+            card.style.transform = '';
+          }, 150);
+        }
+      });
+
       container.appendChild(card);
     });
+  }
+
+  getExamIcon(exam) {
+    const title = (exam.title || '').toLowerCase();
+    if (title.includes('math')) return '🔢';
+    if (title.includes('computer') || title.includes('programming')) return '💻';
+    if (title.includes('database')) return '🗄️';
+    if (title.includes('web')) return '🌐';
+    if (title.includes('data') || title.includes('algorithm')) return '📊';
+    return '📝';
+  }
+
+  getDifficultyColor(exam) {
+    const duration = exam.duration || 0;
+    if (duration > 120) return 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)';
+    if (duration > 90) return 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+    if (duration > 60) return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
   }
 
   async startExam(examId) {

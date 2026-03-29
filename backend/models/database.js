@@ -13,8 +13,13 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error('Database error:', err);
-  else console.log('Connected to SQLite database');
+  if (err) {
+    console.error('❌ Database connection error:', err.message);
+    console.error('Database path:', dbPath);
+    throw err;
+  } else {
+    console.log('✅ Connected to SQLite database at:', dbPath);
+  }
 });
 
 db.configure('busyTimeout', 10000);
@@ -22,11 +27,13 @@ db.configure('busyTimeout', 10000);
 // Initialize database with migrations
 const initializeDatabase = async () => {
   try {
+    console.log('Running database migrations...');
     const migrationManager = new MigrationManager();
     await migrationManager.runMigrations();
-    console.log('Database initialized with migrations');
+    console.log('✅ Database initialized with migrations');
   } catch (error) {
-    console.error('Database initialization failed:', error);
+    console.error('❌ Database initialization failed:', error.message);
+    console.error('Stack trace:', error.stack);
     throw error;
   }
 };

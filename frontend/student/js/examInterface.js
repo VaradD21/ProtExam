@@ -45,6 +45,14 @@ class ExamInterface {
 
   async init() {
     try {
+      // Load saved theme
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        const themeIcon = document.querySelector('.theme-icon');
+        if (themeIcon) themeIcon.textContent = '☀️';
+      }
+
       if (!checkAuth()) return;
 
       const user = getUser();
@@ -80,6 +88,102 @@ class ExamInterface {
       this.hideLoading();
       this.showError('Failed to initialize exam: ' + err.message);
       console.error('Exam initialization error:', err);
+    }
+  }
+
+  setupEventListeners() {
+    // Panel toggle for mobile
+    const panelToggle = document.getElementById('panelToggle');
+    if (panelToggle) {
+      panelToggle.addEventListener('click', () => this.toggleQuestionPanel());
+    }
+
+    // Navigation buttons
+    document.getElementById('prevBtn').addEventListener('click', () => this.previousQuestion());
+    document.getElementById('submitQBtn').addEventListener('click', () => this.nextQuestion());
+    document.getElementById('submitExamBtn').addEventListener('click', () => this.submitExam());
+
+    // Logout button
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (confirm('Are you sure you want to logout? Your progress will be saved.')) {
+        this.stopCamera();
+        clearAuth();
+        window.location.href = '/login.html';
+      }
+    });
+
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => this.toggleTheme());
+    }
+
+    // Close violation warning
+    const closeWarningBtn = document.getElementById('closeWarningBtn');
+    if (closeWarningBtn) {
+      closeWarningBtn.addEventListener('click', () => this.closeViolationWarning());
+    }
+
+    // MCQ option changes
+    document.addEventListener('change', (e) => {
+      if (e.target.name === 'option') {
+        this.handleOptionChange(e.target);
+      }
+    });
+
+    // Descriptive answer changes
+    const textarea = document.getElementById('answerTextarea');
+    if (textarea) {
+      textarea.addEventListener('input', (e) => this.handleDescriptiveChange(e.target));
+    }
+
+    // Question navigation from list
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('question-btn')) {
+        const index = parseInt(e.target.dataset.index);
+        if (!isNaN(index)) {
+          this.goToQuestion(index);
+        }
+      }
+    });
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const filter = e.target.dataset.filter;
+        this.renderQuestionsList(filter);
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+      });
+    });
+  }
+
+  toggleQuestionPanel() {
+    const panel = document.querySelector('.question-panel');
+    if (panel) {
+      panel.classList.toggle('open');
+    }
+  }
+
+  toggleTheme() {
+    const body = document.body;
+    const themeIcon = document.querySelector('.theme-icon');
+
+    body.classList.toggle('dark-theme');
+
+    if (body.classList.contains('dark-theme')) {
+      themeIcon.textContent = '☀️';
+      localStorage.setItem('theme', 'dark');
+    } else {
+      themeIcon.textContent = '🌙';
+      localStorage.setItem('theme', 'light');
+    }
+  }
+
+  closeViolationWarning() {
+    const warning = document.getElementById('violationWarning');
+    if (warning) {
+      warning.style.display = 'none';
     }
   }
 

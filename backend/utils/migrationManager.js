@@ -75,8 +75,10 @@ class MigrationManager {
 
   async runMigrations() {
     try {
+      console.log('Initializing migration system...');
       await this.initialize();
       const executedMigrations = await this.getExecutedMigrations();
+      console.log(`Found ${executedMigrations.length} executed migrations`);
 
       // Get all migration files
       const files = await fs.readdir(this.migrationsDir);
@@ -84,20 +86,31 @@ class MigrationManager {
         .filter(file => file.endsWith('.sql'))
         .sort(); // Sort to ensure proper order
 
+      console.log(`Found ${migrationFiles.length} migration files`);
+
       let executedCount = 0;
 
       for (const file of migrationFiles) {
         const migrationName = path.parse(file).name;
 
         if (!executedMigrations.includes(migrationName)) {
+          console.log(`Executing migration: ${migrationName}`);
           const filePath = path.join(this.migrationsDir, file);
           const sql = await fs.readFile(filePath, 'utf8');
 
-          console.log(`Executing migration: ${migrationName}`);
           await this.executeMigration(migrationName, sql);
           executedCount++;
+        } else {
+          console.log(`Migration ${migrationName} already executed`);
         }
       }
+
+      console.log(`✅ Executed ${executedCount} new migrations`);
+    } catch (error) {
+      console.error('❌ Migration execution failed:', error.message);
+      throw error;
+    }
+  }
 
       console.log(`Migrations completed. Executed ${executedCount} new migrations.`);
       return executedCount;
