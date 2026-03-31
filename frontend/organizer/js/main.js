@@ -495,6 +495,11 @@ class OrganizerDashboard {
         return;
       }
 
+      const formatDateForInput = (value) => {
+        if (!value) return '';
+        return String(value).replace(' ', 'T').slice(0, 16);
+      };
+
       this.currentEditingExamId = examId;
       document.getElementById('modalTitle').textContent = 'Edit Exam';
       document.getElementById('examTitle').value = exam.title;
@@ -503,6 +508,16 @@ class OrganizerDashboard {
       document.getElementById('examTotalMarks').value = exam.totalMarks;
       document.getElementById('examPassingMarks').value = exam.passingMarks;
       document.getElementById('examInstructions').value = exam.instructions || '';
+      document.getElementById('examWeightage').value = exam.weightage ?? 1.0;
+      document.getElementById('examRules').value = exam.rules || '';
+      document.getElementById('shuffleQuestions').checked = Boolean(exam.shuffle_questions ?? exam.shuffleQuestions);
+      document.getElementById('shuffleOptions').checked = Boolean(exam.shuffle_options ?? exam.shuffleOptions);
+      document.getElementById('allowReview').checked = exam.allow_review !== 0 && exam.allowReview !== false;
+      document.getElementById('showResultsImmediately').checked = Boolean(exam.show_results_immediately ?? exam.showResultsImmediately);
+      document.getElementById('examMaxAttempts').value = exam.max_attempts ?? exam.maxAttempts ?? 1;
+      document.getElementById('examStartDate').value = formatDateForInput(exam.start_date || exam.startDate || exam.startTime);
+      document.getElementById('examEndDate').value = formatDateForInput(exam.end_date || exam.endDate || exam.endTime);
+      document.getElementById('examAccessCode').value = exam.access_code || exam.accessCode || '';
 
       document.getElementById('examModal').style.display = 'flex';
       DashboardLogger.debug('Edit exam modal opened', { title: exam.title });
@@ -552,6 +567,8 @@ class OrganizerDashboard {
         DashboardLogger.info('Updating existing exam', { examId: this.currentEditingExamId });
         await apiCall(`/exams/${this.currentEditingExamId}`, 'PUT', data);
         DashboardLogger.success('Exam updated successfully', { examId: this.currentEditingExamId });
+        document.getElementById('examModal').style.display = 'none';
+        this.currentEditingExamId = null;
         this.showSuccess('Exam updated successfully');
       } else {
         DashboardLogger.info('Creating new exam', { title: data.title });

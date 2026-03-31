@@ -53,3 +53,8 @@ coverage/
 # Package lock files (optional - comment out if you want to commit them)
 # package-lock.json
 # yarn.lock
+
+# Local docs and setup helpers
+/*.md
+/setup.bat
+/setup.sh

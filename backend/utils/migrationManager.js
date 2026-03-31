@@ -112,14 +112,6 @@ class MigrationManager {
     }
   }
 
-      console.log(`Migrations completed. Executed ${executedCount} new migrations.`);
-      return executedCount;
-    } catch (error) {
-      console.error('Migration failed:', error);
-      throw error;
-    }
-  }
-
   async createMigration(name, sql) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `${timestamp}_${name}.sql`;

@@ -100,14 +100,63 @@ const getExamById = (examId, callback) => {
 };
 
 const updateExam = (examId, updates, callback) => {
+  const examFieldMap = {
+    title: 'title',
+    description: 'description',
+    duration: 'duration',
+    totalMarks: 'totalMarks',
+    passingMarks: 'passingMarks',
+    instructions: 'instructions',
+    status: 'status',
+    weightage: 'weightage',
+    rules: 'rules',
+    shuffleQuestions: 'shuffle_questions',
+    shuffle_questions: 'shuffle_questions',
+    shuffleOptions: 'shuffle_options',
+    shuffle_options: 'shuffle_options',
+    allowReview: 'allow_review',
+    allow_review: 'allow_review',
+    showResultsImmediately: 'show_results_immediately',
+    show_results_immediately: 'show_results_immediately',
+    maxAttempts: 'max_attempts',
+    max_attempts: 'max_attempts',
+    startDate: 'start_date',
+    start_date: 'start_date',
+    endDate: 'end_date',
+    end_date: 'end_date',
+    accessCode: 'access_code',
+    access_code: 'access_code',
+    startTime: 'startTime',
+    endTime: 'endTime'
+  };
+
+  const booleanColumns = new Set([
+    'shuffle_questions',
+    'shuffle_options',
+    'allow_review',
+    'show_results_immediately'
+  ]);
+
   const fields = [];
   const values = [];
-  for (const [key, value] of Object.entries(updates)) {
-    fields.push(`${key} = ?`);
-    values.push(value);
+
+  for (const [key, value] of Object.entries(updates || {})) {
+    const column = examFieldMap[key];
+
+    if (!column) {
+      continue;
+    }
+
+    fields.push(`${column} = ?`);
+    values.push(booleanColumns.has(column) && typeof value === 'boolean' ? (value ? 1 : 0) : value);
   }
+
+  if (fields.length === 0) {
+    return callback(new Error('No valid exam fields provided'));
+  }
+
   values.push(examId);
-  
+
   db.run(
     `UPDATE exams SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
     values,
