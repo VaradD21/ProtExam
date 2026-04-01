@@ -230,9 +230,19 @@ const getEnrolledExams = (studentId, callback) => {
     `SELECT ex.*, en.status AS enrollment_status
      FROM enrollments en
      INNER JOIN exams ex ON en.examId = ex.id
-     WHERE en.studentId = ? AND en.status = 'enrolled'
+     WHERE en.studentId = ? AND (en.status = 'enrolled' OR en.status IS NULL)
      ORDER BY ex.start_date DESC`,
     [studentId],
+    callback
+  );
+};
+
+const getEnrollment = (examId, studentId, callback) => {
+  db.get(
+    `SELECT en.*
+     FROM enrollments en
+     WHERE en.examId = ? AND en.studentId = ? AND (en.status = 'enrolled' OR en.status IS NULL)`,
+    [examId, studentId],
     callback
   );
 };
@@ -399,6 +409,7 @@ module.exports = {
   enrollStudent,
   getEnrolledStudents,
   getEnrolledExams,
+  getEnrollment,
   createExamSession,
   getExamSession,
   updateExamSession,

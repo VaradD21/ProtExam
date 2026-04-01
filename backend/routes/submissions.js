@@ -7,13 +7,40 @@ const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 router.post('/session/start', authMiddleware, roleMiddleware(['student']), (req, res) => {
   const { examId } = req.body;
   const studentId = req.user.id;
-  const sessionId = `${studentId}_${examId}_${Date.now()}`;
 
-  db.createExamSession(sessionId, examId, studentId, (err) => {
+  db.getEnrollment(examId, studentId, (err, enrollment) => {
     if (err) {
-      return res.status(500).json({ error: 'Failed to start exam' });
+      return res.status(500).json({ error: 'Failed to verify enrollment' });
     }
-    res.json({ sessionId, message: 'Exam session started' });
+    if (!enrollment) {
+      return res.status(403).json({ error: 'You are not enrolled for this exam' });
+    }
+
+    db.getExamById(examId, (err, exam) => {
+      if (err || !exam) {
+        return res.status(404).json({ error: 'Exam not found' });
+      }
+
+      const now = new Date();
+      const start = exam.startDate ? new Date(exam.startDate) : (exam.start_date ? new Date(exam.start_date) : null);
+      const end = exam.endDate ? new Date(exam.endDate) : (exam.end_date ? new Date(exam.end_date) : null);
+
+      if (start && now < start) {
+        return res.status(403).json({ error: 'Exam has not started yet' });
+      }
+
+      if (end && now > end) {
+        return res.status(403).json({ error: 'Exam has already ended' });
+      }
+
+      const sessionId = `${studentId}_${examId}_${Date.now()}`;
+      db.createExamSession(sessionId, examId, studentId, (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to start exam' });
+        }
+        res.json({ sessionId, message: 'Exam session started' });
+      });
+    });
   });
 });
 

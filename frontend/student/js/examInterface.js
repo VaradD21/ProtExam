@@ -231,9 +231,6 @@ class ExamInterface {
         };
       });
 
-      // Request full screen mode
-      await this.requestFullscreen();
-
       console.log('Exam session started:', this.sessionId);
     } catch (err) {
       console.error('Failed to start exam session:', err);
@@ -245,6 +242,10 @@ class ExamInterface {
     return new Promise((resolve) => {
       const modal = document.createElement('div');
       modal.className = 'modal';
+      const duration = this.exam.duration || this.exam.duration_minutes || 'N/A';
+      const totalQ = this.questions ? this.questions.length : 'N/A';
+      const passingMarks = this.exam.passingMarks || this.exam.passing_marks || this.exam.passing_score || 'N/A';
+      
       modal.innerHTML = `
         <div class="modal-content confirmation-modal">
           <div class="modal-header">
@@ -253,9 +254,9 @@ class ExamInterface {
           <div class="modal-body">
             <div class="exam-summary">
               <h4>${this.exam.title}</h4>
-              <p><strong>Duration:</strong> ${this.exam.duration_minutes} minutes</p>
-              <p><strong>Total Questions:</strong> ${this.exam.total_questions}</p>
-              <p><strong>Passing Score:</strong> ${this.exam.passing_score}%</p>
+              <p><strong>Duration:</strong> ${duration} minutes</p>
+              <p><strong>Total Questions:</strong> ${totalQ}</p>
+              <p><strong>Passing Marks:</strong> ${passingMarks}</p>
               ${this.exam.instructions ? `<p><strong>Instructions:</strong> ${this.exam.instructions}</p>` : ''}
             </div>
             <div class="warning-message">

@@ -3,6 +3,39 @@ const router = express.Router();
 const db = require('../models/database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
+const getExamTimeState = (exam) => {
+  const now = new Date();
+  const start = exam.startTime ? new Date(exam.startTime) : (exam.start_date ? new Date(exam.start_date) : null);
+  const end = exam.endTime ? new Date(exam.endTime) : (exam.end_date ? new Date(exam.end_date) : null);
+
+  if (exam.is_active === false || exam.is_active === 0 || exam.status === 'inactive') {
+    return 'inactive';
+  }
+
+  if (start && now < start) {
+    return 'upcoming';
+  }
+
+  if (end && now > end) {
+    return 'closed';
+  }
+
+  return 'ongoing';
+};
+
+const mapExamForStudent = (exam) => {
+  const status = getExamTimeState(exam);
+
+  return {
+    ...exam,
+    studentExamStatus: status,
+    isOngoing: status === 'ongoing',
+    isUpcoming: status === 'upcoming',
+    isClosed: status === 'closed',
+    isInactive: status === 'inactive'
+  };
+};
+
 // Create exam (organizer only)
 router.post('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
   const {
@@ -80,7 +113,46 @@ router.get('/enrolled', authMiddleware, roleMiddleware(['student']), (req, res) 
     if (err) {
       return res.status(500).json({ error: 'Failed to fetch enrolled exams' });
     }
-    res.json(exams || []);
+
+    const mapped = (exams || [])
+      .map(mapExamForStudent)
+      .filter(exam => !exam.isInactive);
+
+    res.json(mapped);
+  });
+});
+
+// Get ongoing enrolled exams (student)
+router.get('/enrolled/ongoing', authMiddleware, roleMiddleware(['student']), (req, res) => {
+  const studentId = req.user.id;
+
+  db.getEnrolledExams(studentId, (err, exams) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to fetch ongoing exams' });
+    }
+
+    const ongoing = (exams || [])
+      .map(mapExamForStudent)
+      .filter(exam => exam.isOngoing);
+
+    res.json(ongoing);
+  });
+});
+
+// Get upcoming enrolled exams (student)
+router.get('/enrolled/upcoming', authMiddleware, roleMiddleware(['student']), (req, res) => {
+  const studentId = req.user.id;
+
+  db.getEnrolledExams(studentId, (err, exams) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to fetch upcoming exams' });
+    }
+
+    const upcoming = (exams || [])
+      .map(mapExamForStudent)
+      .filter(exam => exam.isUpcoming);
+
+    res.json(upcoming);
   });
 });
 
@@ -88,12 +160,36 @@ router.get('/enrolled', authMiddleware, roleMiddleware(['student']), (req, res) 
 router.get('/:examId', authMiddleware, (req, res) => {
   const { examId } = req.params;
 
-  db.getExamById(examId, (err, exam) => {
-    if (err || !exam) {
+  const sendExam = (exam) => {
+    if (!exam) {
       return res.status(404).json({ error: 'Exam not found' });
     }
     res.json(exam);
-  });
+  };
+
+  if (req.user.role === 'student') {
+    db.getEnrollment(examId, req.user.id, (enrollErr, enrollment) => {
+      if (enrollErr) {
+        return res.status(500).json({ error: 'Failed to verify enrollment' });
+      }
+      if (!enrollment) {
+        return res.status(403).json({ error: 'You are not enrolled in this exam' });
+      }
+      db.getExamById(examId, (err, exam) => {
+        if (err || !exam) {
+          return res.status(404).json({ error: 'Exam not found' });
+        }
+        sendExam(exam);
+      });
+    });
+  } else {
+    db.getExamById(examId, (err, exam) => {
+      if (err || !exam) {
+        return res.status(404).json({ error: 'Exam not found' });
+      }
+      sendExam(exam);
+    });
+  }
 });
 
 // Update exam (organizer only)
@@ -125,11 +221,7 @@ router.delete('/:examId', authMiddleware, roleMiddleware(['organizer']), (req, r
 router.get('/:examId/full', authMiddleware, (req, res) => {
   const { examId } = req.params;
 
-  db.getExamById(examId, (err, exam) => {
-    if (err || !exam) {
-      return res.status(404).json({ error: 'Exam not found' });
-    }
-
+  const sendExamWithQuestions = (exam) => {
     db.getQuestionsByExam(examId, (err, questions) => {
       if (err) {
         return res.status(500).json({ error: 'Failed to fetch questions' });
@@ -143,7 +235,6 @@ router.get('/:examId/full', authMiddleware, (req, res) => {
           questionsProcessed++;
 
           if (questionsProcessed === questions.length) {
-            // Randomize question order
             const randomized = questions.sort(() => Math.random() - 0.5);
             res.json({ ...exam, questions: randomized });
           }
@@ -154,7 +245,31 @@ router.get('/:examId/full', authMiddleware, (req, res) => {
         res.json({ ...exam, questions: [] });
       }
     });
-  });
+  };
+
+  if (req.user.role === 'student') {
+    db.getEnrollment(examId, req.user.id, (enrollErr, enrollment) => {
+      if (enrollErr) {
+        return res.status(500).json({ error: 'Failed to verify enrollment' });
+      }
+      if (!enrollment) {
+        return res.status(403).json({ error: 'You are not enrolled in this exam' });
+      }
+      db.getExamById(examId, (err, exam) => {
+        if (err || !exam) {
+          return res.status(404).json({ error: 'Exam not found' });
+        }
+        sendExamWithQuestions(exam);
+      });
+    });
+  } else {
+    db.getExamById(examId, (err, exam) => {
+      if (err || !exam) {
+        return res.status(404).json({ error: 'Exam not found' });
+      }
+      sendExamWithQuestions(exam);
+    });
+  }
 });
 
 // Enroll student in exam

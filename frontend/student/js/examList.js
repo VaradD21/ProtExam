@@ -126,14 +126,14 @@ class StudentExamList {
     const endTime = exam.endTime ? new Date(exam.endTime) : (exam.end_date ? new Date(exam.end_date) : null);
 
     if (exam.is_active === false || exam.is_active === 0 || exam.status === 'inactive') {
-      return { label: 'Inactive', isDisabled: true };
+      return { label: 'Inactive', isDisabled: true, state: 'inactive' };
     }
 
     if (startTime && startTime > now) {
       return {
         label: `Starts at ${this.formatDateTime(startTime)}`,
         isDisabled: true,
-        state: 'scheduled',
+        state: 'upcoming',
         startTime
       };
     }
@@ -142,7 +142,7 @@ class StudentExamList {
       return { label: 'Closed', isDisabled: true, state: 'closed', endTime };
     }
 
-    return { label: 'Active', isDisabled: false, state: 'active', startTime, endTime };
+    return { label: 'Active', isDisabled: false, state: 'ongoing', startTime, endTime };
   }
 
   formatDateTime(date) {
@@ -193,9 +193,9 @@ class StudentExamList {
 
     this.exams.forEach(exam => {
       const status = this.getExamStatus(exam).state;
-      if (status === 'scheduled') scheduledCount += 1;
+      if (status === 'upcoming') scheduledCount += 1;
       else if (status === 'closed') closedCount += 1;
-      else if (status === 'active') activeCount += 1;
+      else if (status === 'ongoing') activeCount += 1;
       else inactiveCount += 1;
     });
 
@@ -252,7 +252,7 @@ class StudentExamList {
 
       card.className = cardClass;
 
-      const countdownText = statusInfo.state === 'scheduled' && startDateRaw ?
+      const countdownText = statusInfo.state === 'upcoming' && startDateRaw ?
         this.getCountdownText(new Date(startDateRaw)) : '';
 
       const examIcon = this.getExamIcon(exam);

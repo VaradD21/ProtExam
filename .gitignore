@@ -48,6 +48,21 @@ coverage/
 .nyc_output
 
 # Testing
+
+# Seed, test, and check files
+scripts/seed.js
+tests/
+scripts/check-schema.js
+
+# Temporary/debug backend files
+backend/add-status-column.js
+backend/check-exam-status.js
+backend/check-exams-schema.js
+backend/check-recent-exams.js
+backend/check-schema.js
+backend/check-student-enrollments.js
+backend/debug-enrollments.js
+backend/test-query.js
 .mocha_output
 
 # Package lock files (optional - comment out if you want to commit them)
