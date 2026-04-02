@@ -6,7 +6,7 @@
   <meta name="description" content="Secure online examination platform with anti-cheating features">
   <meta name="theme-color" content="#667eea">
   <title>ProExam - Student Dashboard</title>
-  <link rel="preconnect" href="http://localhost:8000">
+  <link rel="preconnect" href="http://localhost:3000">
   <link rel="dns-prefetch" href="//fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/exam-list-styles.css">
@@ -195,8 +195,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
-        <button class="btn-primary" onclick="studentExamList.proceedToCamera()">I Understand - Continue</button>
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-primary">I Understand - Continue</button>
       </div>
     </div>
   </div>
@@ -225,8 +225,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
-        <button class="btn-primary" id="cameraContinueBtn" onclick="studentExamList.proceedToFullscreen()" disabled>Continue to Exam</button>
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-primary" id="cameraContinueBtn" disabled>Continue to Exam</button>
       </div>
     </div>
   </div>
@@ -251,8 +251,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-cancel" onclick="studentExamList.cancelExamStart()">Cancel</button>
-        <button class="btn-primary" onclick="studentExamList.startActualExam()">Start Exam</button>
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-primary">Start Exam</button>
       </div>
     </div>
   </div>

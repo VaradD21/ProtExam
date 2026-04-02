@@ -63,6 +63,8 @@ backend/check-schema.js
 backend/check-student-enrollments.js
 backend/debug-enrollments.js
 backend/test-query.js
+backend/update-exam-status.js
+
 .mocha_output
 
 # Package lock files (optional - comment out if you want to commit them)

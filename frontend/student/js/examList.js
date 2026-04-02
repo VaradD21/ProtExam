@@ -442,4 +442,31 @@ class StudentExamList {
 document.addEventListener('DOMContentLoaded', () => {
   const studentExamList = new StudentExamList();
   window.studentExamList = studentExamList;
+
+  // Set up modal button event listeners
+  const continueBtn = document.querySelector('#rulesModal .btn-primary');
+  const cancelBtn = document.querySelector('#rulesModal .btn-cancel');
+  const cameraContinueBtn = document.getElementById('cameraContinueBtn');
+  const cameraCancelBtn = document.querySelector('#cameraModal .btn-cancel');
+  const startExamBtn = document.querySelector('#fullscreenModal .btn-primary');
+  const fullscreenCancelBtn = document.querySelector('#fullscreenModal .btn-cancel');
+
+  if (continueBtn) {
+    continueBtn.addEventListener('click', () => studentExamList.proceedToCamera());
+  }
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => studentExamList.cancelExamStart());
+  }
+  if (cameraContinueBtn) {
+    cameraContinueBtn.addEventListener('click', () => studentExamList.proceedToFullscreen());
+  }
+  if (cameraCancelBtn) {
+    cameraCancelBtn.addEventListener('click', () => studentExamList.cancelExamStart());
+  }
+  if (startExamBtn) {
+    startExamBtn.addEventListener('click', () => studentExamList.startActualExam());
+  }
+  if (fullscreenCancelBtn) {
+    fullscreenCancelBtn.addEventListener('click', () => studentExamList.cancelExamStart());
+  }
 });
