@@ -305,10 +305,16 @@ class StudentExamList {
           </div>
         </div>
 
-        <button class="btn-start ${statusInfo.isDisabled ? 'disabled' : ''}" ${statusInfo.isDisabled ? 'disabled' : ''} onclick="studentExamList.startExam(${exam.id})">
+        <button class="btn-start ${statusInfo.isDisabled ? 'disabled' : ''}" ${statusInfo.isDisabled ? 'disabled' : ''}>
           ${buttonText}
         </button>
       `;
+
+      // Add event listener to the start button
+      const startButton = card.querySelector('.btn-start');
+      if (startButton && !statusInfo.isDisabled) {
+        startButton.addEventListener('click', () => this.startExam(exam.id));
+      }
 
       // Add click animation
       card.addEventListener('click', (e) => {
