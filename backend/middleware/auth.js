@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d';
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable must be set');
+}
 
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -27,4 +32,4 @@ const roleMiddleware = (requiredRoles) => {
   };
 };
 
-module.exports = { authMiddleware, roleMiddleware, JWT_SECRET };
+module.exports = { authMiddleware, roleMiddleware, JWT_SECRET, JWT_EXPIRATION };

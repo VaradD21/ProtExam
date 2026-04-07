@@ -271,6 +271,11 @@ class AntiCheatSystem {
 
   // Log violation to server and local storage
   logViolation(type, details, severity = 'low') {
+    // Don't log violations if exam is already being submitted
+    if (window.examInterface && window.examInterface.isSubmitted) {
+      return;
+    }
+
     this.violations++;
     
     const violation = {

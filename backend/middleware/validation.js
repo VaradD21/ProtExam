@@ -5,7 +5,10 @@ const validateAndSanitize = (req, res, next) => {
   // Sanitize string inputs
   const sanitizeString = (str) => {
     if (typeof str !== 'string') return str;
-    return validator.escape(str.trim());
+    let value = str.trim();
+    value = validator.stripLow(value, true);
+    value = validator.blacklist(value, '\0');
+    return value;
   };
 
   // Recursively sanitize object properties

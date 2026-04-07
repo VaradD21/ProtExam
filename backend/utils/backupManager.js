@@ -1,13 +1,16 @@
 // Advanced backup and recovery system
 const fs = require('fs').promises;
 const path = require('path');
-const { exec } = require('child_process');
+const crypto = require('crypto');
 const util = require('util');
-const execAsync = util.promisify(exec);
+const zlib = require('zlib');
+const gzipAsync = util.promisify(zlib.gzip);
+const gunzipAsync = util.promisify(zlib.gunzip);
 
 class BackupManager {
   constructor(db, config = {}) {
     this.db = db;
+    this.dbPath = config.dbPath || null;
     this.backupDir = config.backupDir || path.join(process.cwd(), 'backups');
     this.retentionDays = config.retentionDays || 30;
     this.maxBackups = config.maxBackups || 10;
@@ -105,36 +108,37 @@ class BackupManager {
   }
 
   // Compress backup file
-  async compressBackup(backupPath, options) {
+  async compressBackup(backupPath) {
     const compressedPath = `${backupPath}.gz`;
 
     try {
-      // Use system gzip for compression
-      await execAsync(`gzip -c "${backupPath}" > "${compressedPath}"`);
-
-      // Remove original uncompressed file
+      const fileContents = await fs.readFile(backupPath);
+      const compressedData = await gzipAsync(fileContents);
+      await fs.writeFile(compressedPath, compressedData);
       await fs.unlink(backupPath);
-
       return compressedPath;
     } catch (error) {
       console.error('Compression failed:', error);
-      // If compression fails, return original path
       return backupPath;
     }
   }
 
   // Encrypt backup file
   async encryptBackup(filePath) {
+    if (!this.encryptionKey) {
+      throw new Error('Encryption key not configured');
+    }
+
     const encryptedPath = `${filePath}.enc`;
+    const iv = crypto.randomBytes(16);
+    const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
 
     try {
-      // Use openssl for encryption (requires openssl to be installed)
-      const command = `openssl enc -aes-256-cbc -salt -in "${filePath}" -out "${encryptedPath}" -k "${this.encryptionKey}"`;
-      await execAsync(command);
-
-      // Remove original file
+      const fileContents = await fs.readFile(filePath);
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+      const encryptedData = Buffer.concat([cipher.update(fileContents), cipher.final()]);
+      await fs.writeFile(encryptedPath, Buffer.concat([iv, encryptedData]));
       await fs.unlink(filePath);
-
       return encryptedPath;
     } catch (error) {
       console.error('Encryption failed:', error);
@@ -149,8 +153,13 @@ class BackupManager {
     }
 
     try {
-      const command = `openssl enc -d -aes-256-cbc -in "${encryptedPath}" -out "${outputPath}" -k "${this.encryptionKey}"`;
-      await execAsync(command);
+      const encryptedData = await fs.readFile(encryptedPath);
+      const iv = encryptedData.slice(0, 16);
+      const ciphertext = encryptedData.slice(16);
+      const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+      const decryptedData = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      await fs.writeFile(outputPath, decryptedData);
     } catch (error) {
       console.error('Decryption failed:', error);
       throw new Error('Backup decryption failed');
@@ -187,8 +196,8 @@ class BackupManager {
   // Calculate file checksum
   async calculateChecksum(filePath) {
     try {
-      const { stdout } = await execAsync(`sha256sum "${filePath}" | cut -d' ' -f1`);
-      return stdout.trim();
+      const data = await fs.readFile(filePath);
+      return crypto.createHash('sha256').update(data).digest('hex');
     } catch (error) {
       console.error('Checksum calculation failed:', error);
       return null;
@@ -220,26 +229,33 @@ class BackupManager {
     const { verifyOnly = false, targetDb = null } = options;
 
     try {
-      let actualBackupPath = backupPath;
+      const resolvedBackupPath = path.resolve(backupPath);
+      const resolvedBackupDir = path.resolve(this.backupDir);
+      if (!resolvedBackupPath.startsWith(resolvedBackupDir)) {
+        throw new Error('Invalid backup path');
+      }
+
+      let actualBackupPath = resolvedBackupPath;
 
       // Handle encrypted backups
-      if (path.extname(backupPath) === '.enc') {
+      if (path.extname(actualBackupPath) === '.enc') {
         if (!this.encryptionKey) {
           throw new Error('Encryption key required for encrypted backup');
         }
-        const decryptedPath = backupPath.replace('.enc', '.decrypted.db');
-        await this.decryptBackup(backupPath, decryptedPath);
+        const decryptedPath = actualBackupPath.replace(/\.enc$/, '');
+        await this.decryptBackup(actualBackupPath, decryptedPath);
         actualBackupPath = decryptedPath;
       }
 
       // Handle compressed backups
       if (path.extname(actualBackupPath) === '.gz') {
-        const decompressedPath = actualBackupPath.replace('.gz', '');
-        await execAsync(`gzip -d -c "${actualBackupPath}" > "${decompressedPath}"`);
+        const decompressedPath = actualBackupPath.replace(/\.gz$/, '');
+        const compressedData = await fs.readFile(actualBackupPath);
+        const decompressedData = await gunzipAsync(compressedData);
+        await fs.writeFile(decompressedPath, decompressedData);
         actualBackupPath = decompressedPath;
       }
 
-      // Verify backup integrity
       const isValid = await this.verifyBackup(actualBackupPath);
       if (!isValid) {
         throw new Error('Backup verification failed');
@@ -247,15 +263,20 @@ class BackupManager {
 
       if (verifyOnly) {
         console.log('Backup verification successful');
+        if (actualBackupPath !== resolvedBackupPath) {
+          await fs.unlink(actualBackupPath);
+        }
         return { verified: true };
       }
 
-      // Perform restoration
-      const targetDatabase = targetDb || this.db;
-      await this.restoreFromFile(targetDatabase, actualBackupPath);
+      const targetDatabasePath = targetDb || this.dbPath;
+      if (!targetDatabasePath) {
+        throw new Error('Target database path not configured');
+      }
 
-      // Clean up temporary files
-      if (actualBackupPath !== backupPath) {
+      await this.restoreFromFile(actualBackupPath, targetDatabasePath);
+
+      if (actualBackupPath !== resolvedBackupPath) {
         await fs.unlink(actualBackupPath);
       }
 
@@ -298,26 +319,13 @@ class BackupManager {
   }
 
   // Restore database from file
-  async restoreFromFile(targetDb, backupPath) {
-    return new Promise((resolve, reject) => {
-      // Close existing connections and replace database file
-      targetDb.close((err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+  async restoreFromFile(backupPath, dbPath) {
+    const resolvedDbPath = path.resolve(dbPath);
+    if (!resolvedDbPath.startsWith(path.resolve(this.dbPath || path.dirname(resolvedDbPath)))) {
+      throw new Error('Invalid database restore path');
+    }
 
-        // Copy backup file to database location
-        const dbPath = targetDb.filename || './database.db';
-        fs.copyFile(backupPath, dbPath)
-          .then(() => {
-            // Reopen database connection
-            targetDb = new (require('sqlite3').verbose()).Database(dbPath);
-            resolve();
-          })
-          .catch(reject);
-      });
-    });
+    await fs.copyFile(backupPath, resolvedDbPath);
   }
 
   // List available backups

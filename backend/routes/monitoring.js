@@ -15,25 +15,14 @@ router.get('/exam/:examId', (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch students' });
     }
 
-    // For each student, get their session data
-    let studentsProcessed = 0;
-    const enrichedStudents = [];
+    const monitoredStudents = (students || []).map((student) => ({
+      id: student.id,
+      email: student.email,
+      fullName: student.fullName,
+      status: 'enrolled'
+    }));
 
-    students.forEach((student) => {
-      // Get latest session for this student
-      // Note: In production, you'd have a query that gets the latest session
-      db.getViolationsBySession = (sessionId, callback) => {
-        // This would need a proper query in production
-        callback(null, []);
-      };
-      studentsProcessed++;
-    });
-
-    if (students.length === 0) {
-      return res.json([]);
-    }
-
-    res.json(enrichedStudents);
+    res.json(monitoredStudents);
   });
 });
 

@@ -3,6 +3,19 @@ const router = express.Router();
 const db = require('../models/database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
+const dbGet = (fn, ...args) => new Promise((resolve, reject) => fn(...args, (err, result) => {
+  if (err) return reject(err);
+  resolve(result);
+}));
+
+const getSubmissionsBySession = (sessionId) => dbGet(db.getSubmissionsBySession, sessionId);
+const getQuestionById = (questionId) => dbGet(db.getQuestionById, questionId);
+const getQuestionOptions = (questionId) => dbGet(db.getQuestionOptions, questionId);
+const gradeSubmission = (submissionId, marks, isAutoGraded, gradedBy, feedback) => new Promise((resolve, reject) => {
+  db.gradeSubmission(submissionId, marks, isAutoGraded, gradedBy, feedback, (err) => (err ? reject(err) : resolve()));
+});
+const getSessionResults = (sessionId) => dbGet(db.getSessionResults, sessionId);
+
 // Start exam session
 router.post('/session/start', authMiddleware, roleMiddleware(['student']), (req, res) => {
   const { examId } = req.body;
@@ -83,61 +96,40 @@ router.get('/session/:sessionId/submissions', authMiddleware, (req, res) => {
 });
 
 // End exam session and calculate results
-router.post('/session/:sessionId/end', authMiddleware, roleMiddleware(['student']), (req, res) => {
+router.post('/session/:sessionId/end', authMiddleware, roleMiddleware(['student']), async (req, res) => {
   const { sessionId } = req.params;
   const { totalViolations } = req.body;
 
-  // Update session status
-  db.updateExamSession(sessionId, {
-    status: 'completed',
-    endTime: new Date().toISOString(),
-    totalViolations: totalViolations || 0
-  }, (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Failed to end session' });
+  try {
+    await dbGet(db.updateExamSession, sessionId, {
+      status: 'completed',
+      endTime: new Date().toISOString(),
+      totalViolations: totalViolations || 0
+    });
+
+    const submissions = await getSubmissionsBySession(sessionId);
+    if (submissions && submissions.length > 0) {
+      await Promise.all(submissions.map(async (submission) => {
+        const question = await getQuestionById(submission.questionId);
+        if (question && question.type === 'mcq') {
+          const options = await getQuestionOptions(question.id);
+          const correctOption = Array.isArray(options) ? options.find(o => o.isCorrect) : null;
+          const isCorrect = correctOption ? submission.answer === correctOption.optionText : false;
+          const marks = isCorrect ? question.marks : 0;
+          await gradeSubmission(submission.id, marks, true, null, 'Auto-graded MCQ');
+        }
+      }));
     }
 
-    // Get all submissions and auto-grade MCQs
-    db.getSubmissionsBySession(sessionId, (err, submissions) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to fetch submissions' });
-      }
-
-      let submissionsGraded = 0;
-      submissions.forEach((submission) => {
-        // Get question details
-        db.getQuestionById(submission.questionId, (err, question) => {
-          if (question && question.type === 'mcq') {
-            // Auto-grade MCQ
-            db.getQuestionOptions(question.id, (err, options) => {
-              const correctOption = options.find(o => o.isCorrect);
-              const isCorrect = submission.answer === correctOption.optionText;
-              const marks = isCorrect ? question.marks : 0;
-
-              db.gradeSubmission(submission.id, marks, true, null, '', () => {
-                submissionsGraded++;
-              });
-            });
-          } else {
-            submissionsGraded++;
-          }
-        });
-      });
-
-      // Get final results
-      setTimeout(() => {
-        db.getSessionResults(sessionId, (err, result) => {
-          if (err) {
-            return res.status(500).json({ error: 'Failed to calculate results' });
-          }
-          res.json({
-            message: 'Exam completed',
-            results: result
-          });
-        });
-      }, 1000);
+    const result = await getSessionResults(sessionId);
+    res.json({
+      message: 'Exam completed',
+      results: result
     });
-  });
+  } catch (err) {
+    console.error('Failed to end session:', err);
+    res.status(500).json({ error: 'Failed to end session' });
+  }
 });
 
 // Get exam results for session

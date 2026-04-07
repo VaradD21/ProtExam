@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -13,7 +15,8 @@ const questionRoutes = require('./routes/questions');
 const submissionRoutes = require('./routes/submissions');
 const logRoutes = require('./routes/logs');
 const monitoringRoutes = require('./routes/monitoring');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, JWT_SECRET } = require('./middleware/auth');
+const jwt = require('jsonwebtoken');
 const { authLimiter, apiLimiter, examLimiter } = require('./middleware/rateLimit');
 const { validateAndSanitize } = require('./middleware/validation');
 const { Logger, requestLogger } = require('./utils/logger');
@@ -42,9 +45,20 @@ const logger = new Logger();
 
 const app = express();
 const server = http.createServer(app);
+
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3001')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0 && origin !== '*');
+
+const allowedSocketOrigins = (process.env.WS_CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3001')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0 && origin !== '*');
+
 const io = socketIO(server, {
   cors: {
-    origin: "*",
+    origin: allowedSocketOrigins.length > 0 ? allowedSocketOrigins : false,
     methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
@@ -67,8 +81,8 @@ app.use(compression());
 
 // Middleware
 app.use(cors({
-  origin: "*",
-  credentials: true
+  origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+  credentials: false
 }));
 app.use(validateAndSanitize); // Input validation and sanitization
 app.use(requestLogger(logger)); // Request logging
@@ -81,6 +95,22 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
+});
+
+// Socket authentication middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1] || socket.handshake.query?.token;
+  if (!token) {
+    return next(new Error('Authentication token required'));
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.user = decoded;
+    return next();
+  } catch (err) {
+    return next(new Error('Invalid authentication token'));
+  }
 });
 
 // Serve static files
@@ -270,8 +300,21 @@ app.delete('/api/certificates/:certificateId', authMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// File download endpoint (authenticated)
+app.get('/api/files/:fileId/download', authMiddleware, async (req, res) => {
+  const { fileId } = req.params;
+  const fileInfo = await fileManager.getFileInfo(fileId);
+
+  if (!fileInfo) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  if (req.user.role !== 'organizer' && req.user.id !== fileInfo.uploadedBy) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  return res.download(fileInfo.path, fileInfo.originalName || path.basename(fileInfo.path));
+});
 
 // File upload endpoints
 app.post('/api/upload', authMiddleware, upload.single('file'), async (req, res) => {
@@ -335,10 +378,16 @@ app.get('/api/files/stats', authMiddleware, async (req, res) => {
 app.delete('/api/files/:fileId', authMiddleware, async (req, res) => {
   const { fileId } = req.params;
 
-  // Check if user owns the file or is organizer
-  // In a real implementation, this would check file ownership
-
   try {
+    const fileInfo = await fileManager.getFileInfo(fileId);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (req.user.role !== 'organizer' && req.user.id !== fileInfo.uploadedBy) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const success = await fileManager.deleteFile(fileId);
     if (success) {
       res.json({ success: true });
@@ -628,6 +677,7 @@ const notificationManager = new NotificationManager(db, io);
 
 // Initialize backup manager
 const backupManager = new BackupManager(db, {
+  dbPath: path.join(__dirname, 'data', 'protexam.db'),
   backupDir: path.join(__dirname, 'backups'),
   retentionDays: 30,
   maxBackups: 10,
@@ -635,11 +685,21 @@ const backupManager = new BackupManager(db, {
 });
 
 io.on('connection', (socket) => {
-  console.log(`Student connected: ${socket.id}`);
+  console.log(`Socket connected: ${socket.id}`);
+
+  const authenticatedUser = socket.user;
+  if (!authenticatedUser) {
+    socket.disconnect(true);
+    return;
+  }
 
   // Student joins exam session
   socket.on('exam_start', (data) => {
     const { studentId, examId, sessionId } = data;
+    if (authenticatedUser.role !== 'student' || authenticatedUser.id !== studentId) {
+      return socket.emit('error', 'Unauthorized exam start request');
+    }
+
     activeStudents[sessionId] = {
       studentId,
       examId,
@@ -657,53 +717,56 @@ io.on('connection', (socket) => {
   // Log suspicious activity
   socket.on('log_violation', (data) => {
     const { sessionId, violationType, timestamp, details } = data;
-    if (activeStudents[sessionId]) {
-      activeStudents[sessionId].violations++;
-      activeStudents[sessionId].lastViolation = violationType;
-      activeStudents[sessionId].lastViolationTime = timestamp;
-      
-      // Update status based on violation count
-      if (activeStudents[sessionId].violations >= 3) {
-        activeStudents[sessionId].status = 'suspicious';
-      } else if (activeStudents[sessionId].violations >= 1) {
-        activeStudents[sessionId].status = 'warning';
-      }
 
-      // Log to database
-      db.logStudentActivity(sessionId, violationType, timestamp, JSON.stringify(details), (err) => {
-        if (err) console.error('Failed to log violation:', err);
-      });
-
-      // Notify organizer
-      io.to(`monitoring_${activeStudents[sessionId].examId}`).emit('violation_logged', {
-        sessionId,
-        violationType,
-        timestamp,
-        studentStatus: activeStudents[sessionId]
-      });
+    const session = activeStudents[sessionId];
+    if (!session || authenticatedUser.role !== 'student' || authenticatedUser.id !== session.studentId) {
+      return socket.emit('error', 'Unauthorized violation report');
     }
+
+    session.violations++;
+    session.lastViolation = violationType;
+    session.lastViolationTime = timestamp;
+
+    if (session.violations >= 3) {
+      session.status = 'suspicious';
+    } else if (session.violations >= 1) {
+      session.status = 'warning';
+    }
+
+    db.logStudentActivity(sessionId, violationType, timestamp, JSON.stringify(details), (err) => {
+      if (err) console.error('Failed to log violation:', err);
+    });
+
+    io.to(`monitoring_${session.examId}`).emit('violation_logged', {
+      sessionId,
+      violationType,
+      timestamp,
+      studentStatus: session
+    });
   });
 
   // Update last activity
   socket.on('activity', (data) => {
     const { sessionId } = data;
-    if (activeStudents[sessionId]) {
-      activeStudents[sessionId].lastActivity = Date.now();
+    const session = activeStudents[sessionId];
+    if (session && authenticatedUser.role === 'student' && authenticatedUser.id === session.studentId) {
+      session.lastActivity = Date.now();
     }
   });
 
   // Student leaves exam
   socket.on('exam_end', (data) => {
     const { sessionId } = data;
-    const examId = activeStudents[sessionId]?.examId;
-    if (sessionId && activeStudents[sessionId]) {
-      activeStudents[sessionId].status = 'completed';
-      io.to(`monitoring_${examId}`).emit('student_status_update', activeStudents[sessionId]);
+    const session = activeStudents[sessionId];
+    if (!session || authenticatedUser.role !== 'student' || authenticatedUser.id !== session.studentId) {
+      return socket.emit('error', 'Unauthorized exam end request');
     }
+
+    session.status = 'completed';
+    io.to(`monitoring_${session.examId}`).emit('student_status_update', session);
   });
 
   socket.on('disconnect', () => {
-    // Mark student as disconnected
     for (const [sessionId, student] of Object.entries(activeStudents)) {
       if (student.socketId === socket.id) {
         student.status = 'disconnected';

@@ -3,10 +3,10 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../models/database');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, JWT_EXPIRATION } = require('../middleware/auth');
 
 // Register
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { email, password, fullName, role } = req.body;
 
   if (!email || !password || !fullName || !role) {
@@ -17,18 +17,13 @@ router.post('/register', (req, res) => {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  db.createUser(email, password, fullName, role, (err, user) => {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        return res.status(400).json({ error: 'Email already exists' });
-      }
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    const user = await db.createUser(email, password, fullName, role);
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_EXPIRATION }
     );
 
     res.status(201).json({
@@ -36,7 +31,13 @@ router.post('/register', (req, res) => {
       user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
       token
     });
-  });
+  } catch (err) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Login
@@ -60,7 +61,7 @@ router.post('/login', (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_EXPIRATION }
     );
 
     res.json({

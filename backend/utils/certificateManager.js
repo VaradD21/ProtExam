@@ -1,4 +1,6 @@
 // Certificate generation and management
+const crypto = require('crypto');
+
 class CertificateManager {
   constructor() {
     this.certificates = new Map(); // certificateId -> certificate data
@@ -33,7 +35,15 @@ class CertificateManager {
       organizerName = 'Exam Organizer'
     } = resultData;
 
-    const certificateId = `cert_${sessionId}_${Date.now()}`;
+    if (passed !== true && passed !== 1) {
+      throw new Error('Certificates can only be issued for passed exams');
+    }
+
+    if (!percentage || percentage < 50) {
+      throw new Error('Student must achieve minimum passing percentage');
+    }
+
+    const certificateId = `cert_${sessionId}_${crypto.randomBytes(8).toString('hex')}`;
     const certificate = {
       id: certificateId,
       sessionId,
@@ -43,7 +53,7 @@ class CertificateManager {
       examTitle,
       score,
       percentage,
-      passed,
+      passed: true,
       completedAt: new Date(completedAt),
       issuedAt: new Date(),
       organizerName,
@@ -56,10 +66,9 @@ class CertificateManager {
     return certificate;
   }
 
-  // Generate verification code
+  // Generate strong verification code
   generateVerificationCode() {
-    return Math.random().toString(36).substring(2, 15) +
-           Math.random().toString(36).substring(2, 15);
+    return crypto.randomBytes(32).toString('hex');
   }
 
   // Get certificate by ID

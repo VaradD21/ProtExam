@@ -39,15 +39,22 @@ const initializeDatabase = async () => {
 };
 
 // User operations
-const createUser = (email, password, fullName, role, callback) => {
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  db.run(
-    'INSERT INTO users (email, password, fullName, role) VALUES (?, ?, ?, ?)',
-    [email, hashedPassword, fullName, role],
-    function(err) {
-      callback(err, { id: this.lastID, email, fullName, role });
-    }
-  );
+const createUser = async (email, password, fullName, role) => {
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    return new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO users (email, password, fullName, role) VALUES (?, ?, ?, ?)',
+        [email, hashedPassword, fullName, role],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, email, fullName, role });
+        }
+      );
+    });
+  } catch (error) {
+    throw error;
+  }
 };
 
 const getUserByEmail = (email, callback) => {

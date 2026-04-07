@@ -6,6 +6,7 @@ const crypto = require('crypto');
 class FileManager {
   constructor() {
     this.uploadDir = path.join(__dirname, '../uploads');
+    this.metadataPath = path.join(this.uploadDir, 'files.json');
     this.allowedTypes = {
       image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
       document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
@@ -14,7 +15,12 @@ class FileManager {
       code: ['text/plain', 'application/json', 'application/javascript', 'text/html', 'text/css']
     };
     this.maxFileSize = 10 * 1024 * 1024; // 10MB
-    this.initializeDirectories();
+    this.files = new Map();
+    this.initializeDirectories()
+      .then(() => this.loadMetadata())
+      .catch((error) => {
+        console.error('Failed to load file metadata:', error);
+      });
   }
 
   async initializeDirectories() {
@@ -37,6 +43,25 @@ class FileManager {
         }
       }
     }
+  }
+
+  async loadMetadata() {
+    try {
+      const fileContents = await fs.readFile(this.metadataPath, 'utf8');
+      const storedFiles = JSON.parse(fileContents);
+      if (Array.isArray(storedFiles)) {
+        storedFiles.forEach((fileInfo) => this.files.set(fileInfo.id, fileInfo));
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.error('Failed to load file metadata:', error);
+      }
+    }
+  }
+
+  async persistMetadata() {
+    const metadata = Array.from(this.files.values());
+    await fs.writeFile(this.metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
   }
 
   // Generate unique filename
@@ -89,20 +114,24 @@ class FileManager {
     // Move file from temp to permanent location
     await fs.rename(file.path, filePath);
 
+    const fileId = crypto.randomUUID();
     const fileInfo = {
-      id: crypto.randomUUID(),
+      id: fileId,
       filename,
       originalName: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
       category,
       path: filePath,
-      url: `/uploads/${category}/${filename}`,
+      url: `/api/files/${fileId}/download`,
       uploadedBy: context.userId,
       uploadedAt: new Date(),
       context: context, // examId, questionId, etc.
       checksum: await this.calculateChecksum(filePath)
     };
+
+    this.files.set(fileId, fileInfo);
+    await this.persistMetadata();
 
     return fileInfo;
   }
@@ -115,23 +144,27 @@ class FileManager {
 
   // Get file info
   async getFileInfo(fileId) {
-    // In a real implementation, this would query a database
-    // For now, return mock data
-    return {
-      id: fileId,
-      filename: 'example.pdf',
-      url: '/uploads/documents/example.pdf',
-      uploadedAt: new Date()
-    };
+    return this.files.get(fileId) || null;
   }
 
   // Delete file
   async deleteFile(fileId) {
-    // In a real implementation, this would:
-    // 1. Get file info from database
-    // 2. Delete file from filesystem
-    // 3. Remove database record
-    console.log(`Deleting file: ${fileId}`);
+    const fileInfo = this.files.get(fileId);
+    if (!fileInfo) {
+      return false;
+    }
+
+    try {
+      await fs.unlink(fileInfo.path);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.error(`Failed to delete file from filesystem: ${fileInfo.path}`, error);
+        throw error;
+      }
+    }
+
+    this.files.delete(fileId);
+    await this.persistMetadata();
     return true;
   }
 

@@ -672,15 +672,17 @@ class ExamInterface {
     }
   }
 
-  async submitExam() {
+  async submitExam(skipConfirm = false) {
     if (this.isSubmitted) return;
 
     // Save last answer
     await this.nextQuestion();
 
-    // Confirm submission
-    const confirmed = confirm('Are you sure you want to submit the exam? You cannot go back after submission.');
-    if (!confirmed) return;
+    // Confirm submission (skip for auto-submit due to violations/timeout)
+    if (!skipConfirm) {
+      const confirmed = confirm('Are you sure you want to submit the exam? You cannot go back after submission.');
+      if (!confirmed) return;
+    }
 
     this.isSubmitted = true;
 
@@ -707,7 +709,11 @@ class ExamInterface {
 
     alert(reason);
     this.stopCamera();
-    this.submitExam();
+    // Disable further violation detection
+    if (window.antiCheat) {
+      window.antiCheat.violations = Infinity; // Prevent multiple triggers
+    }
+    this.submitExam(true); // true = skipConfirm
   }
 
   startTimer() {

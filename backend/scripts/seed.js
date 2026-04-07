@@ -254,25 +254,31 @@ async function seedDatabase() {
 
     // Seed users
     console.log('Seeding users...');
-    let userCount = 0;
-    sampleData.users.forEach(user => {
-      const hashedPassword = bcrypt.hashSync(user.password, 10);
-      db.run(
-        'INSERT OR IGNORE INTO users (email, password, fullName, role) VALUES (?, ?, ?, ?)',
-        [user.email, hashedPassword, user.fullName, user.role],
-        function(err) {
-          if (err) {
-            console.error('Error seeding user:', err);
-            return;
-          }
+    (async () => {
+      let userCount = 0;
+      for (const user of sampleData.users) {
+        try {
+          const hashedPassword = await bcrypt.hash(user.password, 10);
+          await new Promise((resolve, reject) => {
+            db.run(
+              'INSERT OR IGNORE INTO users (email, password, fullName, role) VALUES (?, ?, ?, ?)',
+              [user.email, hashedPassword, user.fullName, user.role],
+              function(err) {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
           userCount++;
-          if (userCount === sampleData.users.length) {
-            console.log(`✓ Seeded ${userCount} users`);
-            checkCompletion();
-          }
+        } catch (err) {
+          console.error('Error seeding user:', err);
         }
-      );
-    });
+      }
+      if (userCount === sampleData.users.length) {
+        console.log(`✓ Seeded ${userCount} users`);
+        checkCompletion();
+      }
+    })();
 
     // Seed exams
     console.log('Seeding exams...');
