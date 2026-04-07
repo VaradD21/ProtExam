@@ -50,7 +50,7 @@ class ExamInterface {
       if (savedTheme === 'dark') {
         document.body.classList.add('dark-theme');
         const themeIcon = document.querySelector('.theme-icon');
-        if (themeIcon) themeIcon.textContent = '☀️';
+        if (themeIcon) themeIcon.textContent = '\u2600\ufe0f';
       }
 
       if (!checkAuth()) return;
@@ -77,18 +77,59 @@ class ExamInterface {
       this.showLoading('Loading exam...');
       await this.loadExam(examId);
       await this.startExamSession();
-      await this.requestFullscreen();
-      await this.startCamera();
-      this.setupEventListeners();
-      this.renderQuestionsList();
-      this.displayQuestion();
-      this.startTimer();
       this.hideLoading();
+
+      // Show start overlay/modal
+      this.showStartExamOverlay();
     } catch (err) {
       this.hideLoading();
       this.showError('Failed to initialize exam: ' + err.message);
       console.error('Exam initialization error:', err);
     }
+  }
+
+  showStartExamOverlay() {
+    // Hide main exam UI until permissions granted
+    document.getElementById('examContainer').style.display = 'none';
+    let overlay = document.createElement('div');
+    overlay.id = 'startExamOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(30, 41, 59, 0.98)';
+    overlay.style.zIndex = '9999';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.innerHTML = `
+      <div style="background: #fff; color: #222; padding: 2rem 2.5rem; border-radius: 12px; box-shadow: 0 2px 24px #0003; max-width: 90vw; text-align: center;">
+        <h2>Ready to Start Your Exam?</h2>
+        <p>To begin, we need access to your camera and fullscreen mode.<br><b>Click the button below to start.</b></p>
+        <button id="startExamBtn" style="margin-top: 1.5rem; font-size: 1.2rem; padding: 0.7em 2em; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer;">Start Exam</button>
+        <div id="startExamError" style="color: #b91c1c; margin-top: 1em; display: none;"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('startExamBtn').addEventListener('click', async () => {
+      const errorDiv = document.getElementById('startExamError');
+      errorDiv.style.display = 'none';
+      try {
+        await this.startCamera();
+        await this.requestFullscreen();
+        overlay.remove();
+        document.getElementById('examContainer').style.display = '';
+        this.setupEventListeners();
+        this.renderQuestionsList();
+        this.displayQuestion();
+        this.startTimer();
+      } catch (err) {
+        errorDiv.textContent = 'Failed to start camera or fullscreen: ' + (err.message || err);
+        errorDiv.style.display = 'block';
+      }
+    });
   }
 
   setupEventListeners() {
@@ -293,9 +334,19 @@ class ExamInterface {
   async requestFullscreen() {
     try {
       await window.antiCheat.requestFullscreen();
+      console.log('Exam started in fullscreen mode');
     } catch (err) {
-      this.showError('Fullscreen permission required for exam mode.');
-      console.warn('Fullscreen request failed:', err);
+      // Fullscreen is important for proctoring but offer to continue anyway
+      const continueAnyway = confirm(
+        `⚠️ Fullscreen Mode Failed\n\n${err.message}\n\nDo you want to continue without fullscreen? The exam may have limited anti-cheating protection.`
+      );
+      
+      if (!continueAnyway) {
+        // User rejected - restart the browser
+        throw err;
+      }
+      
+      console.warn('Exam started without fullscreen mode');
     }
   }
 

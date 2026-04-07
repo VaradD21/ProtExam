@@ -365,20 +365,56 @@ class AntiCheatSystem {
   // Enter fullscreen
   async requestFullscreen(element = document.documentElement) {
     try {
+      let fsPromise = null;
+
+      // Try standard Fullscreen API first
       if (element.requestFullscreen) {
-        await element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) {
-        await element.webkitRequestFullscreen();
-      } else if (element.mozRequestFullScreen) {
-        await element.mozRequestFullScreen();
-      } else if (element.msRequestFullscreen) {
-        await element.msRequestFullscreen();
+        fsPromise = element.requestFullscreen();
       }
-      this.isFullscreen = true;
-      console.log('Fullscreen requested');
+      // Webkit (Chrome, Safari)
+      else if (element.webkitRequestFullscreen) {
+        fsPromise = element.webkitRequestFullscreen();
+      }
+      // Mozilla (Firefox)
+      else if (element.mozRequestFullScreen) {
+        fsPromise = element.mozRequestFullScreen();
+      }
+      // Microsoft (Edge, IE)
+      else if (element.msRequestFullscreen) {
+        fsPromise = element.msRequestFullscreen();
+      }
+      // No fullscreen API available
+      else {
+        throw new Error('Fullscreen API not supported in this browser');
+      }
+
+      // Wait for the promise if it returns one
+      if (fsPromise && typeof fsPromise.then === 'function') {
+        await fsPromise;
+      }
+
+      // Set a timeout to check if fullscreen was actually entered
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          const isFullscreen = !!(document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement);
+          
+          if (isFullscreen) {
+            this.isFullscreen = true;
+            console.log('✓ Fullscreen mode activated');
+            resolve();
+          } else {
+            console.warn('⚠ Fullscreen may not have been fully activated');
+            this.isFullscreen = true; // Continue anyway
+            resolve();
+          }
+        }, 500);
+      });
     } catch (err) {
-      console.error('Fullscreen request failed:', err);
-      alert('Fullscreen mode is required to start the exam');
+      console.error('❌ Fullscreen request failed:', err);
+      throw new Error(`Fullscreen unavailable: ${err.message}. Please use a modern browser.`);
     }
   }
 }
