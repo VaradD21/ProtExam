@@ -117,8 +117,8 @@ class ExamInterface {
       const errorDiv = document.getElementById('startExamError');
       errorDiv.style.display = 'none';
       try {
-        await this.startCamera();
         await this.requestFullscreen();
+        await this.startCamera();
         overlay.remove();
         document.getElementById('examContainer').style.display = '';
         this.setupEventListeners();
@@ -129,73 +129,6 @@ class ExamInterface {
         errorDiv.textContent = 'Failed to start camera or fullscreen: ' + (err.message || err);
         errorDiv.style.display = 'block';
       }
-    });
-  }
-
-  setupEventListeners() {
-    // Panel toggle for mobile
-    const panelToggle = document.getElementById('panelToggle');
-    if (panelToggle) {
-      panelToggle.addEventListener('click', () => this.toggleQuestionPanel());
-    }
-
-    // Navigation buttons
-    document.getElementById('prevBtn').addEventListener('click', () => this.previousQuestion());
-    document.getElementById('submitQBtn').addEventListener('click', () => this.nextQuestion());
-    document.getElementById('submitExamBtn').addEventListener('click', () => this.submitExam());
-
-    // Logout button
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      if (confirm('Are you sure you want to logout? Your progress will be saved.')) {
-        this.stopCamera();
-        clearAuth();
-        window.location.href = '/login.html';
-      }
-    });
-
-    // Theme toggle
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => this.toggleTheme());
-    }
-
-    // Close violation warning
-    const closeWarningBtn = document.getElementById('closeWarningBtn');
-    if (closeWarningBtn) {
-      closeWarningBtn.addEventListener('click', () => this.closeViolationWarning());
-    }
-
-    // MCQ option changes
-    document.addEventListener('change', (e) => {
-      if (e.target.name === 'option') {
-        this.handleOptionChange(e.target);
-      }
-    });
-
-    // Descriptive answer changes
-    const textarea = document.getElementById('answerTextarea');
-    if (textarea) {
-      textarea.addEventListener('input', (e) => this.handleDescriptiveChange(e.target));
-    }
-
-    // Question navigation from list
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('question-btn')) {
-        const index = Number.parseInt(e.target.dataset.index, 10);
-        if (!Number.isNaN(index)) {
-          this.goToQuestion(index);
-        }
-      }
-    });
-
-    // Filter buttons
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const filter = e.target.dataset.filter;
-        this.renderQuestionsList(filter);
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-      });
     });
   }
 
@@ -528,12 +461,16 @@ class ExamInterface {
   }
 
   setupEventListeners() {
+    const panelToggle = document.getElementById('panelToggle');
+    if (panelToggle) {
+      panelToggle.addEventListener('click', () => this.toggleQuestionPanel());
+    }
+
     document.getElementById('prevBtn').addEventListener('click', () => this.previousQuestion());
     document.getElementById('submitQBtn').addEventListener('click', () => this.nextQuestion());
     document.getElementById('submitExamBtn').addEventListener('click', () => this.submitExam());
     document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
     
-    // Dark mode toggle
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
       themeToggle.addEventListener('click', () => this.toggleDarkMode());
@@ -543,7 +480,6 @@ class ExamInterface {
       e.target.parentElement.style.display = 'none';
     });
 
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -552,7 +488,6 @@ class ExamInterface {
       });
     });
 
-    // Track answer changes
     const updateAnswerMetadata = (questionId) => {
       if (!this.answerMetadata[questionId]) {
         this.answerMetadata[questionId] = {
@@ -569,7 +504,6 @@ class ExamInterface {
       }
     };
 
-    // MCQ change listener
     document.addEventListener('change', (e) => {
       if (e.target.name === 'option') {
         const questionId = Number.parseInt(e.target.dataset.questionId, 10);
@@ -579,7 +513,6 @@ class ExamInterface {
       }
     });
 
-    // Descriptive answer listener
     document.getElementById('answerTextarea')?.addEventListener('input', (e) => {
       const questionId = this.questions[this.currentQuestionIndex].id;
       this.answers[questionId] = e.target.value;
@@ -742,6 +675,10 @@ class ExamInterface {
       const result = await apiCall(`/submissions/session/${this.sessionId}/end`, 'POST', {
         totalViolations: window.antiCheat.getViolationCount()
       });
+
+      if (window.antiCheat) {
+        window.antiCheat.notifyExamEnd(this.sessionId);
+      }
 
       this.stopCamera();
 

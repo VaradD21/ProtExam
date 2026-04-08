@@ -12,8 +12,41 @@ class AntiCheatSystem {
     this.inactivityTimeout = 60000; // 1 minute
     this.fullscreenExitCount = 0;
     this.fullscreenExitWarnings = 0;
+    this.examSocket = null;
 
+    this.initializeSocket();
     this.initializeDetection();
+  }
+
+  initializeSocket() {
+    if (typeof io === 'undefined') {
+      console.warn('Socket.IO client is not loaded; real-time monitoring will be unavailable.');
+      return;
+    }
+
+    try {
+      this.examSocket = window.examSocket = io({
+        auth: { token: getToken() }
+      });
+
+      this.examSocket.on('connect', () => {
+        console.log('Connected to monitoring socket:', this.examSocket.id);
+      });
+
+      this.examSocket.on('connect_error', (err) => {
+        console.error('Socket connection failed:', err);
+      });
+
+      this.examSocket.on('violation_logged', (data) => {
+        console.log('Violation logged event received:', data);
+      });
+
+      this.examSocket.on('error', (error) => {
+        console.error('Socket error:', error);
+      });
+    } catch (err) {
+      console.error('Failed to initialize monitor socket:', err);
+    }
   }
 
   initializeDetection() {
@@ -305,8 +338,8 @@ class AntiCheatSystem {
       }).catch(err => console.error('Failed to log violation:', err));
 
       // Notify via WebSocket if available
-      if (window.examSocket) {
-        window.examSocket.emit('log_violation', {
+      if (this.examSocket && this.examSocket.connected) {
+        this.examSocket.emit('log_violation', {
           sessionId: this.sessionId,
           violationType: type,
           timestamp: Date.now(),
@@ -350,6 +383,21 @@ class AntiCheatSystem {
   // Set session ID
   setSessionId(sessionId) {
     this.sessionId = sessionId;
+
+    if (this.examSocket && this.examSocket.connected) {
+      this.examSocket.emit('exam_start', {
+        studentId: getUser()?.id,
+        examId: window.examInterface?.exam?.id,
+        sessionId
+      });
+    }
+  }
+
+  // Notify server about exam end
+  notifyExamEnd(sessionId) {
+    if (this.examSocket && this.examSocket.connected) {
+      this.examSocket.emit('exam_end', { sessionId });
+    }
   }
 
   // Get violation count

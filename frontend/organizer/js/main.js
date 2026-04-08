@@ -69,6 +69,8 @@ class OrganizerDashboard {
     this.currentExam = null;
     this.currentEditingExamId = null;
     this.activeStudents = {};
+    this.monitorSocket = null;
+    this.currentMonitoringExamId = null;
     this.stats = {
       examsCreated: 0,
       studentsEnrolled: 0,
@@ -104,6 +106,7 @@ class OrganizerDashboard {
     try {
       DashboardLogger.info('Setting up event listeners');
       this.setupEventListeners();
+      this.initializeSocket();
       
       DashboardLogger.info('Loading exams');
       await this.loadExams();
@@ -423,6 +426,11 @@ class OrganizerDashboard {
 
   async loadMonitoringData(examId) {
     try {
+      if (this.monitorSocket && this.monitorSocket.connected) {
+        this.joinMonitoringRoom(examId);
+      }
+      this.currentMonitoringExamId = examId;
+
       // Get enrolled students
       const students = await apiCall(`/exams/${examId}/students`);
       const container = document.getElementById('studentMonitoringList');
@@ -431,6 +439,7 @@ class OrganizerDashboard {
       students.forEach(student => {
         const row = document.createElement('div');
         row.className = 'student-row';
+        row.dataset.studentId = student.id;
 
         // Get student status from active students (from WebSocket)
         const status = this.activeStudents[student.id] || { status: 'not_started', violations: 0 };
@@ -460,6 +469,78 @@ class OrganizerDashboard {
       option.textContent = exam.title;
       select.appendChild(option);
     });
+  }
+
+  initializeSocket() {
+    if (typeof io === 'undefined') {
+      DashboardLogger.warn('Socket.IO client is not available. Real-time monitoring will not work.');
+      return;
+    }
+
+    try {
+      this.monitorSocket = io({
+        auth: { token: getToken() }
+      });
+
+      this.monitorSocket.on('connect', () => {
+        DashboardLogger.info('Connected to monitoring socket', { socketId: this.monitorSocket.id });
+      });
+
+      this.monitorSocket.on('connect_error', (err) => {
+        DashboardLogger.error('Monitoring socket connection failed', { message: err.message || err });
+      });
+
+      this.monitorSocket.on('student_status_update', (session) => {
+        DashboardLogger.info('Student status update received', session);
+        this.activeStudents[session.studentId] = session;
+        if (session.examId === this.currentMonitoringExamId) {
+          this.refreshMonitoringRow(session.studentId);
+        }
+      });
+
+      this.monitorSocket.on('violation_logged', (data) => {
+        DashboardLogger.warn('Violation logged event received', data);
+        if (data.studentStatus) {
+          this.activeStudents[data.studentStatus.studentId] = data.studentStatus;
+          if (data.studentStatus.examId === this.currentMonitoringExamId) {
+            this.refreshMonitoringRow(data.studentStatus.studentId);
+            this.showWarning(`Violation recorded for student ${data.studentStatus.studentId}: ${data.violationType}`);
+          }
+        }
+      });
+    } catch (err) {
+      DashboardLogger.error('Failed to initialize monitoring socket', { message: err.message });
+    }
+  }
+
+  joinMonitoringRoom(examId) {
+    if (!this.monitorSocket || !this.monitorSocket.connected) {
+      return;
+    }
+
+    DashboardLogger.info('Joining monitoring room', { examId });
+    this.monitorSocket.emit('monitoring_join', { examId });
+  }
+
+  refreshMonitoringRow(studentId) {
+    const row = document.querySelector(`.student-row[data-student-id="${studentId}"]`);
+    const session = this.activeStudents[studentId];
+
+    if (!row || !session) {
+      return;
+    }
+
+    const badge = row.querySelector('.badge');
+    const violations = row.querySelector('.row-info:nth-of-type(2)');
+
+    if (badge) {
+      badge.textContent = session.status;
+      badge.className = `badge badge-${session.status}`;
+    }
+
+    if (violations) {
+      violations.textContent = `⚠️ ${session.violations || 0} violations`;
+    }
   }
 
   async loadResults(examId) {

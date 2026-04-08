@@ -739,6 +739,17 @@ io.on('connection', (socket) => {
     io.to(`monitoring_${examId}`).emit('student_status_update', activeStudents[sessionId]);
   });
 
+  socket.on('monitoring_join', (data) => {
+    const { examId } = data;
+    if (authenticatedUser.role !== 'organizer') {
+      return socket.emit('error', 'Unauthorized monitoring join request');
+    }
+
+    socket.join(`monitoring_${examId}`);
+    socket.emit('monitoring_joined', { examId });
+    console.log(`Organizer joined monitoring room for exam ${examId}`);
+  });
+
   // Log suspicious activity
   socket.on('log_violation', (data) => {
     const { sessionId, violationType, timestamp, details } = data;
