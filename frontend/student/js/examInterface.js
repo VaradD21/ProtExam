@@ -181,8 +181,8 @@ class ExamInterface {
     // Question navigation from list
     document.addEventListener('click', (e) => {
       if (e.target.classList.contains('question-btn')) {
-        const index = parseInt(e.target.dataset.index);
-        if (!isNaN(index)) {
+        const index = Number.parseInt(e.target.dataset.index, 10);
+        if (!Number.isNaN(index)) {
           this.goToQuestion(index);
         }
       }
@@ -572,7 +572,7 @@ class ExamInterface {
     // MCQ change listener
     document.addEventListener('change', (e) => {
       if (e.target.name === 'option') {
-        const questionId = parseInt(e.target.dataset.questionId);
+        const questionId = Number.parseInt(e.target.dataset.questionId, 10);
         this.answers[questionId] = e.target.value;
         updateAnswerMetadata(questionId);
         this.updateQuestionStatus(questionId, true);

@@ -11,8 +11,18 @@ router.post('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  if (typeof marks !== 'number' || marks < 1) {
+    return res.status(400).json({ error: 'Question marks must be a positive number' });
+  }
+
   if (!['mcq', 'descriptive'].includes(type)) {
     return res.status(400).json({ error: 'Invalid question type' });
+  }
+
+  if (type === 'mcq') {
+    if (!Array.isArray(req.body.options) || req.body.options.length < 2) {
+      return res.status(400).json({ error: 'MCQ questions must include at least two options' });
+    }
   }
 
   db.createQuestion(examId, type, content, marks, orderNum || 0, (err, result) => {
@@ -20,17 +30,30 @@ router.post('/', authMiddleware, roleMiddleware(['organizer']), (req, res) => {
       return res.status(500).json({ error: 'Failed to create question' });
     }
 
-    // If MCQ, add options
-    if (type === 'mcq' && req.body.options && Array.isArray(req.body.options)) {
-      let optionsProcessed = 0;
-      req.body.options.forEach((option) => {
-        db.createQuestionOption(result.id, option.text, option.isCorrect || false, () => {
-          optionsProcessed++;
+    const options = Array.isArray(req.body.options) ? req.body.options : [];
+
+    if (type === 'mcq' && options.length > 0) {
+      const optionPromises = options.map((option) => {
+        return new Promise((resolve, reject) => {
+          db.createQuestionOption(result.id, option.text, option.isCorrect || false, (optionErr) => {
+            if (optionErr) {
+              return reject(optionErr);
+            }
+            resolve();
+          });
         });
       });
-    }
 
-    res.status(201).json({ questionId: result.id, message: 'Question created successfully' });
+      Promise.all(optionPromises)
+        .then(() => {
+          res.status(201).json({ questionId: result.id, message: 'Question created successfully' });
+        })
+        .catch((optionError) => {
+          res.status(500).json({ error: 'Failed to create question options' });
+        });
+    } else {
+      res.status(201).json({ questionId: result.id, message: 'Question created successfully' });
+    }
   });
 });
 

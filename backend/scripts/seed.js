@@ -315,7 +315,7 @@ async function seedDatabase() {
       const totalItems = allQuestions.length + allQuestions.filter(q => q.type === 'mcq').reduce((sum, q) => sum + q.options.length, 0);
 
       Object.keys(sampleData.questions).forEach(examIndex => {
-        const examId = parseInt(examIndex);
+        const examId = Number.parseInt(examIndex, 10);
         const questions = sampleData.questions[examId];
 
         questions.forEach((question, questionIndex) => {

@@ -134,12 +134,8 @@ async function handleAuth(e) {
       payload.fullName = elements.fullNameInput.value.trim();
     }
 
-    console.log('Making API call to:', `/auth${endpoint}`, 'with payload:', payload);
-
     const data = await apiCall(`/auth${endpoint}`, 'POST', payload);
-    console.log('API response:', data);
 
-    // Save authentication data
     if (!data.token) {
       throw new Error('No token received from server');
     }
@@ -149,22 +145,18 @@ async function handleAuth(e) {
 
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    console.log('Token and user saved to localStorage');
 
     if (isRegistering) {
       showSuccess('Registration successful! Redirecting to exam list...');
       setTimeout(() => {
-        console.log('Redirecting to role page:', currentRole);
         redirectToRole(currentRole);
       }, 1500);
     } else {
-      console.log('Redirecting to role page:', currentRole);
       redirectToRole(currentRole);
     }
 
   } catch (err) {
-    console.error('Auth error:', err);
-    console.error('Error stack:', err.stack);
+    console.error(err);
     showError(err.message || 'Authentication failed. Please try again.');
   } finally {
     setLoading(false);

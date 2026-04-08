@@ -179,7 +179,7 @@ class OrganizerDashboard {
 
     // Exam select for monitoring
     document.getElementById('examSelectMonitoring').addEventListener('change', (e) => {
-      const examId = parseInt(e.target.value);
+      const examId = Number.parseInt(e.target.value, 10);
       DashboardLogger.info('Exam selected for monitoring', { examId });
       if (e.target.value) {
         this.loadMonitoringData(examId);
@@ -188,7 +188,7 @@ class OrganizerDashboard {
 
     // Exam select for results
     document.getElementById('examSelectResults').addEventListener('change', (e) => {
-      const examId = parseInt(e.target.value);
+      const examId = Number.parseInt(e.target.value, 10);
       DashboardLogger.info('Exam selected for results view', { examId });
       if (e.target.value) {
         this.loadResults(examId);
@@ -375,7 +375,7 @@ class OrganizerDashboard {
     // Edit buttons
     container.querySelectorAll('.btn-edit').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const examId = parseInt(e.target.dataset.examId);
+        const examId = Number.parseInt(e.target.dataset.examId, 10);
         DashboardLogger.info('Edit exam button clicked', { examId });
         this.editExam(examId);
       });
@@ -384,7 +384,7 @@ class OrganizerDashboard {
     // Questions buttons
     container.querySelectorAll('.btn-questions').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const examId = parseInt(e.target.dataset.examId);
+        const examId = Number.parseInt(e.target.dataset.examId, 10);
         DashboardLogger.info('Manage questions button clicked', { examId });
         this.manageQuestions(examId);
       });
@@ -393,7 +393,7 @@ class OrganizerDashboard {
     // Enroll buttons
     container.querySelectorAll('.btn-enroll').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const examId = parseInt(e.target.dataset.examId);
+        const examId = Number.parseInt(e.target.dataset.examId, 10);
         DashboardLogger.info('Manage enrollments button clicked', { examId });
         this.manageEnrollments(examId);
       });
@@ -402,7 +402,7 @@ class OrganizerDashboard {
     // Delete buttons
     container.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const examId = parseInt(e.target.dataset.examId);
+        const examId = Number.parseInt(e.target.dataset.examId, 10);
         DashboardLogger.warn('Delete exam button clicked', { examId });
         this.deleteExam(examId);
       });
@@ -544,9 +544,9 @@ class OrganizerDashboard {
     const data = {
       title: document.getElementById('examTitle').value,
       description: document.getElementById('examDescription').value,
-      duration: parseInt(document.getElementById('examDuration').value),
-      totalMarks: parseInt(document.getElementById('examTotalMarks').value),
-      passingMarks: parseInt(document.getElementById('examPassingMarks').value),
+      duration: Number.parseInt(document.getElementById('examDuration').value, 10),
+      totalMarks: Number.parseInt(document.getElementById('examTotalMarks').value, 10),
+      passingMarks: Number.parseInt(document.getElementById('examPassingMarks').value, 10),
       instructions: document.getElementById('examInstructions').value,
       weightage: parseFloat(document.getElementById('examWeightage').value) || 1.0,
       rules: document.getElementById('examRules').value,
@@ -554,7 +554,7 @@ class OrganizerDashboard {
       shuffleOptions: document.getElementById('shuffleOptions').checked,
       allowReview: document.getElementById('allowReview').checked,
       showResultsImmediately: document.getElementById('showResultsImmediately').checked,
-      maxAttempts: parseInt(document.getElementById('examMaxAttempts').value) || 1,
+      maxAttempts: Number.parseInt(document.getElementById('examMaxAttempts').value, 10) || 1,
       startDate: document.getElementById('examStartDate').value || null,
       endDate: document.getElementById('examEndDate').value || null,
       accessCode: document.getElementById('examAccessCode').value || null
@@ -845,7 +845,7 @@ class OrganizerDashboard {
   async saveQuestion() {
     const type = document.getElementById('questionType').value;
     const content = document.getElementById('questionContent').value.trim();
-    const marks = parseInt(document.getElementById('questionMarks').value);
+    const marks = Number.parseInt(document.getElementById('questionMarks').value, 10);
 
     if (!content || !marks || !this.currentExam) {
       alert('Please fill in all required fields');

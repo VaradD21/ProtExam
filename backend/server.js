@@ -30,6 +30,34 @@ const BackupManager = require('./utils/backupManager');
 const multer = require('multer');
 const db = require('./models/database');
 
+function sendError(res, error, status = 500) {
+  return res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
+}
+
+function sendNotFound(res, message = 'Not found') {
+  return res.status(404).json({ error: message });
+}
+
+function sendForbidden(res) {
+  return res.status(403).json({ error: 'Access denied' });
+}
+
+function ensureOrganizer(req, res) {
+  if (req.user?.role !== 'organizer') {
+    sendForbidden(res);
+    return false;
+  }
+  return true;
+}
+
+function authorizeOwnerOrOrganizer(req, ownerId) {
+  if (req.user?.role === 'organizer') {
+    return true;
+  }
+
+  return String(req.user?.id) === String(ownerId);
+}
+
 // Configure multer for file uploads
 const upload = multer({
   dest: path.join(__dirname, 'uploads/temp'),
@@ -139,8 +167,8 @@ app.get('/api/health', (req, res) => {
 
 // Chat statistics endpoint
 app.get('/api/chat/stats', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const stats = chatManager.getChatStats();
@@ -149,8 +177,8 @@ app.get('/api/chat/stats', authMiddleware, (req, res) => {
 
 // Exam scheduling endpoints
 app.post('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { examId } = req.params;
@@ -176,20 +204,20 @@ app.get('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
 });
 
 app.get('/api/schedule/upcoming', authMiddleware, (req, res) => {
-  const hours = parseInt(req.query.hours) || 24;
+  const hours = Number.parseInt(req.query.hours, 10) || 24;
   const upcoming = examScheduler.getUpcomingExams(hours);
   res.json(upcoming);
 });
 
 app.get('/api/schedule/calendar/:year/:month', authMiddleware, (req, res) => {
   const { year, month } = req.params;
-  const calendarData = examScheduler.getCalendarData(parseInt(year), parseInt(month) - 1); // JS months are 0-based
+  const calendarData = examScheduler.getCalendarData(Number.parseInt(year, 10), Number.parseInt(month, 10) - 1); // JS months are 0-based
   res.json(calendarData);
 });
 
 app.put('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { examId } = req.params;
@@ -204,8 +232,8 @@ app.put('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
 });
 
 app.delete('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { examId } = req.params;
@@ -220,8 +248,8 @@ app.delete('/api/exams/:examId/schedule', authMiddleware, (req, res) => {
 
 // Certificate management endpoints
 app.post('/api/certificates/generate', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const certificateData = req.body;
@@ -253,9 +281,8 @@ app.get('/api/certificates/verify/:certificateId/:verificationCode', (req, res) 
 app.get('/api/students/:studentId/certificates', authMiddleware, (req, res) => {
   const { studentId } = req.params;
 
-  // Allow students to view their own certificates, organizers to view any
-  if (req.user.role !== 'organizer' && req.user.id != studentId) {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!authorizeOwnerOrOrganizer(req, studentId)) {
+    return sendForbidden(res);
   }
 
   const certificates = certificateManager.getStudentCertificates(studentId);
@@ -276,8 +303,8 @@ app.get('/api/certificates/:certificateId/html', (req, res) => {
 });
 
 app.get('/api/certificates/stats', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const stats = certificateManager.getCertificateStats();
@@ -285,8 +312,8 @@ app.get('/api/certificates/stats', authMiddleware, (req, res) => {
 });
 
 app.delete('/api/certificates/:certificateId', authMiddleware, (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { certificateId } = req.params;
@@ -294,7 +321,7 @@ app.delete('/api/certificates/:certificateId', authMiddleware, (req, res) => {
 
   const success = certificateManager.revokeCertificate(certificateId, reason);
   if (!success) {
-    return res.status(404).json({ error: 'Certificate not found' });
+    return sendNotFound(res, 'Certificate not found');
   }
 
   res.json({ success: true });
@@ -306,11 +333,11 @@ app.get('/api/files/:fileId/download', authMiddleware, async (req, res) => {
   const fileInfo = await fileManager.getFileInfo(fileId);
 
   if (!fileInfo) {
-    return res.status(404).json({ error: 'File not found' });
+    return sendNotFound(res, 'File not found');
   }
 
-  if (req.user.role !== 'organizer' && req.user.id !== fileInfo.uploadedBy) {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!authorizeOwnerOrOrganizer(req, fileInfo.uploadedBy)) {
+    return sendForbidden(res);
   }
 
   return res.download(fileInfo.path, fileInfo.originalName || path.basename(fileInfo.path));
@@ -350,21 +377,19 @@ app.post('/api/upload/multiple', authMiddleware, upload.array('files', 10), asyn
       type: req.body.type || 'general'
     };
 
-    const uploadedFiles = [];
-    for (const file of req.files) {
-      const fileInfo = await fileManager.saveFile(file, context);
-      uploadedFiles.push(fileInfo);
-    }
+    const uploadedFiles = await Promise.all(
+      req.files.map((file) => fileManager.saveFile(file, context))
+    );
 
     res.json({ success: true, files: uploadedFiles });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    sendError(res, error, 400);
   }
 });
 
 app.get('/api/files/stats', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   try {
@@ -384,8 +409,8 @@ app.delete('/api/files/:fileId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    if (req.user.role !== 'organizer' && req.user.id !== fileInfo.uploadedBy) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!authorizeOwnerOrOrganizer(req, fileInfo.uploadedBy)) {
+      return sendForbidden(res);
     }
 
     const success = await fileManager.deleteFile(fileId);
@@ -401,8 +426,8 @@ app.delete('/api/files/:fileId', authMiddleware, async (req, res) => {
 
 // Analytics endpoints
 app.get('/api/analytics/dashboard', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   try {
@@ -414,8 +439,8 @@ app.get('/api/analytics/dashboard', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/analytics/exam/:examId', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { examId } = req.params;
@@ -432,8 +457,8 @@ app.get('/api/analytics/exam/:examId', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/analytics/exam/:examId/report', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { examId } = req.params;
@@ -454,8 +479,8 @@ app.get('/api/analytics/exam/:examId/report', authMiddleware, async (req, res) =
 });
 
 app.get('/api/analytics/performance', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { timeRange = '24 hours' } = req.query;
@@ -474,8 +499,8 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
 
   try {
     const notifications = await notificationManager.getUserNotifications(req.user.id, {
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: Number.parseInt(limit, 10),
+      offset: Number.parseInt(offset, 10),
       unreadOnly: unreadOnly === 'true',
       type
     });
@@ -525,8 +550,8 @@ app.delete('/api/notifications/:notificationId', authMiddleware, async (req, res
 });
 
 app.post('/api/notifications/send', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { userIds, templateKey, data, options = {} } = req.body;
@@ -535,13 +560,13 @@ app.post('/api/notifications/send', authMiddleware, async (req, res) => {
     const notifications = await notificationManager.sendBulkNotifications(userIds, templateKey, data, options);
     res.json({ success: true, sent: notifications.length });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    sendError(res, error, 400);
   }
 });
 
 app.post('/api/alerts', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const alertData = req.body;
@@ -550,13 +575,13 @@ app.post('/api/alerts', authMiddleware, async (req, res) => {
     const alert = await notificationManager.createAlert(alertData);
     res.json({ success: true, alert });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    sendError(res, error, 400);
   }
 });
 
 app.get('/api/alerts', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   try {
@@ -568,8 +593,8 @@ app.get('/api/alerts', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/alerts/:alertId', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { alertId } = req.params;
@@ -584,8 +609,8 @@ app.delete('/api/alerts/:alertId', authMiddleware, async (req, res) => {
 
 // Backup management endpoints
 app.post('/api/backup/create', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   try {
@@ -597,8 +622,8 @@ app.post('/api/backup/create', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/backup/list', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   try {
@@ -610,8 +635,8 @@ app.get('/api/backup/list', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/backup/restore', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { backupPath, verifyOnly = false } = req.body;
@@ -625,8 +650,8 @@ app.post('/api/backup/restore', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/backup/export', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { outputPath } = req.body;
@@ -640,8 +665,8 @@ app.post('/api/backup/export', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/backup/import', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'organizer') {
-    return res.status(403).json({ error: 'Access denied' });
+  if (!ensureOrganizer(req, res)) {
+    return;
   }
 
   const { inputPath } = req.body;
