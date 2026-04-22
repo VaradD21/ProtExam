@@ -114,20 +114,40 @@ class ExamInterface {
     `;
     document.body.appendChild(overlay);
     document.getElementById('startExamBtn').addEventListener('click', async () => {
+      const startBtn = document.getElementById('startExamBtn');
       const errorDiv = document.getElementById('startExamError');
       errorDiv.style.display = 'none';
+      startBtn.disabled = true;
+      startBtn.textContent = 'Activating...';
+      
       try {
+        // First request fullscreen
         await this.requestFullscreen();
+        console.log('Fullscreen activated');
+        
+        // Then start camera
         await this.startCamera();
+        console.log('Camera started');
+        
+        // Small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Now display the exam
         overlay.remove();
         document.getElementById('examContainer').style.display = '';
+        
+        // Initialize UI with currentQuestionIndex = 0
+        this.currentQuestionIndex = 0;
         this.setupEventListeners();
         this.renderQuestionsList();
         this.displayQuestion();
         this.startTimer();
       } catch (err) {
+        console.error('Failed to start exam:', err);
         errorDiv.textContent = 'Failed to start camera or fullscreen: ' + (err.message || err);
         errorDiv.style.display = 'block';
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Exam';
       }
     });
   }
@@ -166,14 +186,20 @@ class ExamInterface {
       this.exam = await apiCall(`/exams/${examId}/full`);
       this.questions = this.exam.questions;
 
-      // Shuffle questions for randomization
-      this.questions = this.questions.sort(() => Math.random() - 0.5);
+      // Shuffle questions for randomization if exam setting allows it
+      if (this.exam.shuffleQuestions || this.exam.shuffle_questions) {
+        this.questions = this.questions.sort(() => Math.random() - 0.5);
+      }
+
+      // Always reset to first question
+      this.currentQuestionIndex = 0;
 
       document.getElementById('examTitle').textContent = this.exam.title;
       document.getElementById('totalQuestions').textContent = `of ${this.questions.length}`;
 
       console.log('Exam loaded:', this.exam);
       console.log('Questions:', this.questions);
+      console.log('Starting from question index:', this.currentQuestionIndex);
     } catch (err) {
       console.error('Failed to load exam:', err);
       throw new Error('Unable to load exam. Please check your connection and try again.');
@@ -305,7 +331,7 @@ class ExamInterface {
       cameraStatus.textContent = 'Camera: active';
 
       // Enhanced camera monitoring
-      this.cameraInterval = setInterval(() => this.captureCameraSnapshot(), 15000); // every 15 seconds
+      this.cameraInterval = setInterval(() => this.captureCameraSnapshot(), 5000); // Capture every 5 seconds instead of 15
       this.faceDetectionInterval = setInterval(() => this.detectFacePresence(), 5000); // every 5 seconds
       this.cameraStream = stream;
 

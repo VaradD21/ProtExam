@@ -167,6 +167,13 @@ class OrganizerDashboard {
       btn.addEventListener('click', (e) => {
         const modal = e.target.closest('.modal');
         DashboardLogger.debug('Modal close button clicked', { modalId: modal?.id });
+        
+        // Clean up camera refresh interval if exists
+        if (modal._cameraRefreshInterval) {
+          clearInterval(modal._cameraRefreshInterval);
+          modal._cameraRefreshInterval = null;
+        }
+        
         modal.style.display = 'none';
       });
     });
@@ -1035,6 +1042,53 @@ class OrganizerDashboard {
           `;
           container.appendChild(item);
         });
+      }
+
+      // Try to load and display camera feed
+      try {
+        // Find the session ID for this student in this exam
+        const submissions = await apiCall(`/submissions/exam/${examId}`);
+        const studentSubmission = submissions.find(s => s.studentId === studentId);
+        
+        if (studentSubmission && studentSubmission.sessionId) {
+          const cameraContainer = document.getElementById('studentCameraFeed');
+          if (cameraContainer) {
+            // Load latest camera snapshot with auto-refresh
+            const loadCameraFeed = async () => {
+              try {
+                const snapshots = await apiCall(`/logs/session/${studentSubmission.sessionId}/camera`);
+                if (snapshots && snapshots.length > 0) {
+                  const latestSnapshot = snapshots[0];
+                  cameraContainer.innerHTML = `
+                    <div style="text-align: center;">
+                      <h4>Live Camera Feed</h4>
+                      <img src="${latestSnapshot.imageData}" alt="Student Camera Feed" style="max-width: 100%; height: auto; border-radius: 4px; max-height: 400px;">
+                      <p style="font-size: 0.9em; color: #888;">Captured: ${new Date(latestSnapshot.timestamp).toLocaleString()}</p>
+                    </div>
+                  `;
+                } else {
+                  cameraContainer.innerHTML = '<p>No camera feed available yet</p>';
+                }
+              } catch (err) {
+                console.error('Failed to refresh camera feed:', err);
+              }
+            };
+            
+            // Load initially
+            await loadCameraFeed();
+            
+            // Auto-refresh camera feed every 5 seconds
+            const refreshInterval = setInterval(loadCameraFeed, 5000);
+            
+            // Store interval ID on the modal for cleanup
+            const modal = document.getElementById('studentDetailsModal');
+            if (modal._cameraRefreshInterval) clearInterval(modal._cameraRefreshInterval);
+            modal._cameraRefreshInterval = refreshInterval;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load camera feed:', err);
+        // Continue anyway - camera is optional
       }
 
       document.getElementById('studentDetailsModal').style.display = 'flex';
