@@ -168,10 +168,14 @@ class OrganizerDashboard {
         const modal = e.target.closest('.modal');
         DashboardLogger.debug('Modal close button clicked', { modalId: modal?.id });
         
-        // Clean up camera refresh interval if exists
+        // Clean up camera refresh intervals if exist
         if (modal._cameraRefreshInterval) {
           clearInterval(modal._cameraRefreshInterval);
           modal._cameraRefreshInterval = null;
+        }
+        if (modal._countdownInterval) {
+          clearInterval(modal._countdownInterval);
+          modal._countdownInterval = null;
         }
         
         modal.style.display = 'none';
@@ -1044,47 +1048,118 @@ class OrganizerDashboard {
         });
       }
 
-      // Try to load and display camera feed
+      // Try to load and display camera feed with enhanced features
       try {
         // Find the session ID for this student in this exam
         const submissions = await apiCall(`/submissions/exam/${examId}`);
         const studentSubmission = submissions.find(s => s.studentId === studentId);
         
         if (studentSubmission && studentSubmission.sessionId) {
-          const cameraContainer = document.getElementById('studentCameraFeed');
-          if (cameraContainer) {
-            // Load latest camera snapshot with auto-refresh
-            const loadCameraFeed = async () => {
-              try {
-                const snapshots = await apiCall(`/logs/session/${studentSubmission.sessionId}/camera`);
-                if (snapshots && snapshots.length > 0) {
-                  const latestSnapshot = snapshots[0];
-                  cameraContainer.innerHTML = `
-                    <div style="text-align: center;">
-                      <h4>Live Camera Feed</h4>
-                      <img src="${latestSnapshot.imageData}" alt="Student Camera Feed" style="max-width: 100%; height: auto; border-radius: 4px; max-height: 400px;">
-                      <p style="font-size: 0.9em; color: #888;">Captured: ${new Date(latestSnapshot.timestamp).toLocaleString()}</p>
-                    </div>
+          const modal = document.getElementById('studentDetailsModal');
+          
+          // Variables for managing state
+          let lastSnapshotTime = 0;
+          let connectionLostTime = null;
+          const snapshotInterval = 5000; // 5 second snapshot interval
+          
+          const updateCameraFeed = async () => {
+            try {
+              const snapshots = await apiCall(`/logs/session/${studentSubmission.sessionId}/camera`);
+              
+              if (snapshots && snapshots.length > 0) {
+                // Update connection status
+                document.getElementById('cameraConnectionStatus').innerHTML = '✓ Connected';
+                document.getElementById('cameraConnectionStatus').style.color = '#10b981';
+                connectionLostTime = null;
+                
+                // Display latest snapshot
+                const latestSnapshot = snapshots[0];
+                const latestImg = document.getElementById('latestSnapshot');
+                latestImg.src = latestSnapshot.imageData;
+                latestImg.style.display = 'block';
+                document.getElementById('noSnapshotMsg').style.display = 'none';
+                document.getElementById('latestSnapshotTime').textContent = `Captured: ${new Date(latestSnapshot.timestamp).toLocaleString()}`;
+                
+                lastSnapshotTime = new Date(latestSnapshot.timestamp).getTime();
+                
+                // Display snapshot gallery (limit to 10 most recent)
+                const galleryContainer = document.getElementById('snapshotGallery');
+                galleryContainer.innerHTML = '';
+                
+                snapshots.slice(0, 10).forEach((snapshot, index) => {
+                  const thumbDiv = document.createElement('div');
+                  thumbDiv.style.position = 'relative';
+                  thumbDiv.style.cursor = 'pointer';
+                  thumbDiv.innerHTML = `
+                    <img src="${snapshot.imageData}" alt="Snapshot ${index + 1}" 
+                         style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px; border: 2px solid #ddd; cursor: pointer; transition: 0.2s;"
+                         class="snapshot-thumb"
+                         data-full="${snapshot.imageData}"
+                         data-time="${new Date(snapshot.timestamp).toLocaleTimeString()}">
                   `;
-                } else {
-                  cameraContainer.innerHTML = '<p>No camera feed available yet</p>';
-                }
-              } catch (err) {
-                console.error('Failed to refresh camera feed:', err);
+                  
+                  // Click to view full
+                  thumbDiv.addEventListener('click', () => {
+                    document.getElementById('latestSnapshot').src = snapshot.imageData;
+                    document.getElementById('latestSnapshotTime').textContent = `Captured: ${new Date(snapshot.timestamp).toLocaleString()}`;
+                  });
+                  
+                  // Hover effect
+                  thumbDiv.addEventListener('mouseenter', (e) => {
+                    e.target.style.borderColor = '#2563eb';
+                    e.target.style.opacity = '0.8';
+                  });
+                  thumbDiv.addEventListener('mouseleave', (e) => {
+                    e.target.style.borderColor = '#ddd';
+                    e.target.style.opacity = '1';
+                  });
+                  
+                  galleryContainer.appendChild(thumbDiv);
+                });
+              } else {
+                document.getElementById('noSnapshotMsg').style.display = 'block';
+                document.getElementById('latestSnapshot').style.display = 'none';
               }
-            };
-            
-            // Load initially
-            await loadCameraFeed();
-            
-            // Auto-refresh camera feed every 5 seconds
-            const refreshInterval = setInterval(loadCameraFeed, 5000);
-            
-            // Store interval ID on the modal for cleanup
-            const modal = document.getElementById('studentDetailsModal');
-            if (modal._cameraRefreshInterval) clearInterval(modal._cameraRefreshInterval);
-            modal._cameraRefreshInterval = refreshInterval;
-          }
+            } catch (err) {
+              console.error('Failed to load camera snapshots:', err);
+              
+              // Check if connection is lost (no update for more than 15 seconds)
+              if (lastSnapshotTime > 0) {
+                const timeSinceLastSnapshot = Date.now() - lastSnapshotTime;
+                if (timeSinceLastSnapshot > 15000) {
+                  if (!connectionLostTime) {
+                    connectionLostTime = Date.now();
+                  }
+                  document.getElementById('cameraConnectionStatus').innerHTML = '✕ Connection Lost';
+                  document.getElementById('cameraConnectionStatus').style.color = '#ef4444';
+                }
+              }
+            }
+          };
+          
+          // Countdown timer logic
+          let countdownValue = 5;
+          const updateCountdown = () => {
+            countdownValue--;
+            if (countdownValue <= 0) {
+              countdownValue = 5;
+              updateCameraFeed();
+            }
+            document.getElementById('snapshotCountdown').textContent = countdownValue + 's';
+          };
+          
+          // Initial load
+          await updateCameraFeed();
+          
+          // Set up auto-refresh intervals
+          const countdownInterval = setInterval(updateCountdown, 1000);
+          const feedInterval = setInterval(updateCameraFeed, snapshotInterval);
+          
+          // Store intervals on modal for cleanup
+          if (modal._cameraRefreshInterval) clearInterval(modal._cameraRefreshInterval);
+          if (modal._countdownInterval) clearInterval(modal._countdownInterval);
+          modal._cameraRefreshInterval = feedInterval;
+          modal._countdownInterval = countdownInterval;
         }
       } catch (err) {
         console.error('Failed to load camera feed:', err);

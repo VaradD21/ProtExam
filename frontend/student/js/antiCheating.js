@@ -107,6 +107,7 @@ class AntiCheatSystem {
           // Entered fullscreen
           this.isFullscreen = true;
           this.fullscreenExitWarnings = 0; // Reset warnings when entering fullscreen
+          this.updateFullscreenIndicator(); // Update indicator when entering fullscreen
         }
       });
     });
@@ -114,26 +115,47 @@ class AntiCheatSystem {
 
   handleFullscreenExit() {
     this.fullscreenExitWarnings++;
+    this.updateFullscreenIndicator();
 
     if (this.fullscreenExitWarnings === 1) {
-      this.showWarning('Warning: You exited full screen mode. Please return to full screen to continue the exam.');
+      this.showWarning('⚠️ WARNING: You exited full screen mode. Please return to full screen to continue the exam.');
       // Try to re-enter fullscreen
       setTimeout(() => {
         this.requestFullscreen();
       }, 2000);
     } else if (this.fullscreenExitWarnings === 2) {
-      this.showWarning('Second warning: You exited full screen mode again. One more exit will result in automatic exam submission.');
+      this.showWarning('⚠️ SECOND WARNING: You exited full screen again. One more exit will result in automatic exam submission.');
       setTimeout(() => {
         this.requestFullscreen();
       }, 2000);
     } else if (this.fullscreenExitWarnings >= 3) {
-      this.showError('Third fullscreen exit detected. Exam will be submitted automatically.');
+      this.showError('❌ CRITICAL: Third fullscreen exit detected. Exam will be submitted automatically.');
       // Auto-submit the exam
       setTimeout(() => {
         if (window.examInterface) {
           window.examInterface.submitExam(true);
         }
       }, 3000);
+    }
+  }
+
+  updateFullscreenIndicator() {
+    const indicator = document.getElementById('fullscreenIndicator');
+    if (!indicator) return;
+    
+    const isFullscreen = !!(document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement);
+    
+    if (isFullscreen) {
+      indicator.style.display = 'inline-block';
+      indicator.style.color = '#10b981';
+      indicator.textContent = '✓ Fullscreen Active';
+    } else {
+      indicator.style.display = 'inline-block';
+      indicator.style.color = '#ef4444';
+      indicator.textContent = '✕ Fullscreen Exited (Exit: ' + this.fullscreenExitWarnings + '/3)';
     }
   }
 

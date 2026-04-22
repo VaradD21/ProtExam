@@ -109,23 +109,42 @@ class ExamInterface {
         <h2>Ready to Start Your Exam?</h2>
         <p>To begin, we need access to your camera and fullscreen mode.<br><b>Click the button below to start.</b></p>
         <button id="startExamBtn" style="margin-top: 1.5rem; font-size: 1.2rem; padding: 0.7em 2em; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer;">Start Exam</button>
+        <div id="startExamSpinner" style="display: none; margin-top: 1.5rem; text-align: center;">
+          <div style="border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+          <p id="spinnerText" style="margin-top: 1rem; font-size: 0.95em; color: #666;">Requesting permissions...</p>
+        </div>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
         <div id="startExamError" style="color: #b91c1c; margin-top: 1em; display: none;"></div>
+        <button id="retryExamBtn" style="margin-top: 1rem; font-size: 1rem; padding: 0.6em 1.5em; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer; display: none;">Retry</button>
       </div>
     `;
     document.body.appendChild(overlay);
-    document.getElementById('startExamBtn').addEventListener('click', async () => {
-      const startBtn = document.getElementById('startExamBtn');
-      const errorDiv = document.getElementById('startExamError');
+    
+    const startBtn = document.getElementById('startExamBtn');
+    const retryBtn = document.getElementById('retryExamBtn');
+    const spinner = document.getElementById('startExamSpinner');
+    const spinnerText = document.getElementById('spinnerText');
+    const errorDiv = document.getElementById('startExamError');
+    
+    const attemptStart = async () => {
       errorDiv.style.display = 'none';
-      startBtn.disabled = true;
-      startBtn.textContent = 'Activating...';
+      retryBtn.style.display = 'none';
+      startBtn.style.display = 'none';
+      spinner.style.display = 'block';
       
       try {
         // First request fullscreen
+        spinnerText.textContent = 'Activating fullscreen...';
         await this.requestFullscreen();
         console.log('Fullscreen activated');
         
         // Then start camera
+        spinnerText.textContent = 'Starting camera...';
         await this.startCamera();
         console.log('Camera started');
         
@@ -144,12 +163,16 @@ class ExamInterface {
         this.startTimer();
       } catch (err) {
         console.error('Failed to start exam:', err);
-        errorDiv.textContent = 'Failed to start camera or fullscreen: ' + (err.message || err);
+        spinner.style.display = 'none';
+        startBtn.style.display = 'block';
+        retryBtn.style.display = 'block';
+        errorDiv.textContent = 'Failed to start: ' + (err.message || err);
         errorDiv.style.display = 'block';
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Exam';
       }
-    });
+    };
+    
+    startBtn.addEventListener('click', attemptStart);
+    retryBtn.addEventListener('click', attemptStart);
   }
 
   toggleQuestionPanel() {
